@@ -1,0 +1,13 @@
+{
+  "name": "starch-rival",
+  "owner": {
+    "name": "raiscan"
+  },
+  "description": "Starch Rival, an unofficial port of poteto's pstack for Codex and Claude Code.",
+  "plugins": [
+    {
+      "name": "starch-rival",
+      "source": "./claude"
+    }
+  ]
+}

@@ -30,6 +30,12 @@ HARNESSES = ("codex", "claude")
 CODEX_FIELDS = {"name", "description", "license", "allowed-tools", "metadata"}
 MODEL_PATH = "~/.config/pstack/models.md"
 OLD_MODEL_PATH = "~/.cursor/rules/pstack-models.mdc"
+PLUGIN_NAME = "starch-rival"
+PLUGIN_HOME = "https://github.com/raiscan/starch-rival"
+MARKETPLACES = {
+    "codex": Path(".agents/plugins/marketplace.json"),
+    "claude": Path(".claude-plugin/marketplace.json"),
+}
 ADAPTER = (
     "\n\n## Local harness adapter\n\n"
     "Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, "
@@ -61,6 +67,70 @@ def read_manifest(root):
     if path.is_absolute() or ".." in path.parts or value["path"].startswith("-"):
         raise PortError("Upstream path must be relative to the source repository")
     return value
+
+
+def read_release(root):
+    value = json.loads((root / BAKING / "release.json").read_text())
+    if (not isinstance(value, dict) or set(value) != {"version"}
+            or not isinstance(value["version"], str)
+            or not re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", value["version"])):
+        raise PortError("release.json must contain one MAJOR.MINOR.PATCH version")
+    return value
+
+
+def bump_version(root, version=None):
+    previous = read_release(root)["version"]
+    parts = tuple(int(part) for part in previous.split("."))
+    version = version or ".".join(map(str, (*parts[:2], parts[2] + 1)))
+    if (not isinstance(version, str)
+            or not re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", version)
+            or tuple(int(part) for part in version.split(".")) <= parts):
+        raise PortError("The new release version must be a newer MAJOR.MINOR.PATCH version")
+    (root / BAKING / "release.json").write_text(json.dumps({"version": version}, indent=2) + "\n")
+    return {"status": "version_bumped", "previous_version": previous, "version": version}
+
+
+def marketplace(harness):
+    if harness == "codex":
+        return {"name": PLUGIN_NAME, "interface": {"displayName": "Starch Rival"}, "plugins": [{
+            "name": PLUGIN_NAME, "source": {"source": "local", "path": "./codex"},
+            "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+            "category": "Productivity",
+        }]}
+    return {"name": PLUGIN_NAME, "owner": {"name": "raiscan"},
+            "description": "Starch Rival, an unofficial port of poteto's pstack for Codex and Claude Code.",
+            "plugins": [{"name": PLUGIN_NAME, "source": "./claude"}]}
+
+
+def plugin_manifests(root, harness):
+    upstream = read_manifest(root)
+    original = json.loads((source_root(root) / "plugin.json").read_text())
+    common = {
+        "name": PLUGIN_NAME, "version": read_release(root)["version"],
+        "description": "Starch Rival: an unofficial port of Lauren Tan (poteto)'s pstack workflows.",
+        "author": {"name": "raiscan", "url": "https://github.com/raiscan"},
+        "homepage": PLUGIN_HOME, "repository": PLUGIN_HOME,
+        "license": original["license"],
+        "keywords": list(dict.fromkeys([PLUGIN_NAME, *original.get("keywords", [])])),
+    }
+    portable = {**original, **common}
+    portable["extensions"] = {**original.get("extensions", {}), "com.github.raiscan.starch-rival": {
+        "upstream": {**upstream, "name": original["name"], "version": original.get("version"),
+                     "author": original.get("author"), "homepage": original.get("homepage")},
+    }}
+    native = {**common, "skills": "./skills/"}
+    if harness == "codex":
+        native["interface"] = {"displayName": "Starch Rival", "developerName": "raiscan"}
+    else:
+        # Replaces Claude's default agents/ scan. Those verbatim Cursor agents
+        # remain supporting references, not registered native Claude agents.
+        native["agents"] = []
+    return {Path("plugin.json"): portable, Path("." + harness + "-plugin/plugin.json"): native}
+
+
+def write_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
 
 
 def object_hash(kind, body):
@@ -119,7 +189,8 @@ def fingerprint(root):
         for path in sorted(base.rglob("*")):
             if path.is_file() and "__pycache__" not in path.parts:
                 value.update(str(path.relative_to(root)).encode() + b"\0" + path.read_bytes() + b"\0")
-    value.update((root / BAKING / "upstream.json").read_bytes())
+    for name in ("upstream.json", "release.json"):
+        value.update((root / BAKING / name).read_bytes())
     return value.hexdigest()
 
 
@@ -150,6 +221,7 @@ def adapted_body(root, name, body):
 
 def bake(root):
     manifest = source_manifest(root)
+    release = read_release(root)
     input_id = fingerprint(root)
     cache = root / ".cache"
     cache.mkdir(exist_ok=True)
@@ -187,24 +259,29 @@ def bake(root):
                         policy_file.write_text(yaml.safe_dump(policy, sort_keys=False))
                 body = adapted_body(root, name, body)
                 skill.write_text("---\n" + yaml.safe_dump(front, sort_keys=False, allow_unicode=True) + "---" + ADAPTER + body)
+            for relative, value in plugin_manifests(root, harness).items():
+                write_json(output / relative, value)
             (output / "port-manifest.json").write_text(json.dumps({
                 "upstream": manifest, "input_sha256": input_id, "harness": harness,
-                "skills": len(skills),
+                "skills": len(skills), "version": release["version"],
             }, indent=2) + "\n")
             destination = root / harness
             if destination.exists():
                 shutil.rmtree(destination)
             output.rename(destination)
             count = len(skills)
-    return {"status": "baked", "skills": count, "harnesses": list(HARNESSES), "input_sha256": input_id}
+        write_json(root / MARKETPLACES[harness], marketplace(harness))
+    return {"status": "baked", "skills": count, "harnesses": list(HARNESSES),
+            "version": release["version"], "input_sha256": input_id}
 
 
 def build(root):
     return bake(root)
 
 
-def validate(root):
+def validate(root, tracked=False):
     upstream = source_manifest(root)
+    release = read_release(root)
     source = source_root(root)
     input_id = fingerprint(root)
     count = 0
@@ -215,13 +292,23 @@ def validate(root):
         manifest = json.loads((output / "port-manifest.json").read_text())
         if manifest["input_sha256"] != input_id:
             raise PortError("Baked output is stale; run automation/baking/scripts/pstack.py bake and review it")
-        if manifest.get("upstream") != upstream or manifest.get("harness") != harness:
-            raise PortError("Baked package provenance differs: " + harness)
         expected_files = {path.relative_to(source) for path in source.rglob("*") if path.is_file()}
-        additions = {Path("PORT.md"), Path("models.md"), Path("port-manifest.json")}
+        generated_manifests = plugin_manifests(root, harness)
+        additions = {Path("PORT.md"), Path("models.md"), Path("port-manifest.json"), *generated_manifests}
         skills = sorted((source / "skills").glob("*/SKILL.md"))
-        if manifest.get("skills") != len(skills):
-            raise PortError("Baked skill count differs: " + harness)
+        if manifest != {"upstream": upstream, "input_sha256": input_id, "harness": harness,
+                        "skills": len(skills), "version": release["version"]}:
+            raise PortError("Baked package provenance or version differs: " + harness)
+        for relative, expected in generated_manifests.items():
+            if json.loads((output / relative).read_text()) != expected:
+                raise PortError("Generated plugin manifest differs: " + str(output / relative))
+            if relative not in expected_files and (output / relative).stat().st_mode & 0o111:
+                raise PortError("Generated plugin metadata must not be executable: " + str(relative))
+        if json.loads((root / MARKETPLACES[harness]).read_text()) != marketplace(harness):
+            raise PortError("Native marketplace differs: " + str(MARKETPLACES[harness]))
+        for path in (output / "port-manifest.json", root / MARKETPLACES[harness]):
+            if path.is_symlink() or path.stat().st_mode & 0o111:
+                raise PortError("Generated metadata must be a nonexecutable regular file: " + str(path))
         for original in skills:
             name = original.parent.name
             front, actual_body = split_skill((output / "skills" / name / "SKILL.md").read_text())
@@ -251,6 +338,8 @@ def validate(root):
                 raise PortError("Generated executable mode changed: " + str(relative))
             if relative.parts[0] == "skills" and relative.name == "SKILL.md":
                 continue
+            if relative in generated_manifests:
+                continue
             if harness == "codex" and relative.name == "openai.yaml":
                 continue
             expected = original.read_bytes()
@@ -261,7 +350,71 @@ def validate(root):
         for name in ("PORT.md", "models.md"):
             if (output / name).read_bytes() != (root / BAKING / "port" / name).read_bytes():
                 raise PortError("Generated adapter differs: " + name)
-    return {"status": "valid", "skills_checked": count}
+    if tracked:
+        validate_tracked(root)
+    return {"status": "valid", "skills_checked": count, "version": release["version"], "tracked": tracked}
+
+
+def validate_tracked(root):
+    """Match the reviewed working bundles to the actual publication index."""
+    expected = {Path(harness) / path.relative_to(root / harness)
+                for harness in HARNESSES for path in (root / harness).rglob("*") if path.is_file()}
+    expected.update(MARKETPLACES.values())
+    expected.add(BAKING / "release.json")
+    raw = git(root, "ls-files", "--stage", "-z", "--", *HARNESSES,
+              *(str(path) for path in MARKETPLACES.values()), str(BAKING / "release.json"), binary=True)
+    entries = {}
+    for line in raw.split(b"\0"):
+        if not line:
+            continue
+        metadata, path = line.split(b"\t", 1)
+        mode, oid, stage = metadata.decode().split()
+        relative = Path(os.fsdecode(path))
+        if stage != "0" or relative in entries:
+            raise PortError("Unmerged publication entry: " + str(relative))
+        entries[relative] = (mode, oid)
+    if set(entries) != expected:
+        missing = sorted(str(path) for path in expected - set(entries))
+        extra = sorted(str(path) for path in set(entries) - expected)
+        raise PortError("Publication index inventory differs; stage every baked supporting file"
+                        + ("; missing: " + ", ".join(missing) if missing else "")
+                        + ("; extra: " + ", ".join(extra) if extra else ""))
+    for relative, (mode, oid) in entries.items():
+        path = root / relative
+        expected_mode = "100755" if path.stat().st_mode & 0o111 else "100644"
+        if path.is_symlink() or mode != expected_mode or oid != object_hash("blob", path.read_bytes()).hex():
+            raise PortError("Publication index bytes or mode differ; stage the reviewed file: " + str(relative))
+
+
+def owned_legacy_link(root, link, target):
+    if not link.is_symlink():
+        return False
+    try:
+        relative = Path(os.readlink(link)).relative_to(root / ".cache/installed")
+    except ValueError:
+        return False
+    return bool(len(relative.parts) == 4 and re.fullmatch(r"[0-9a-f]{64}", relative.parts[0])
+                and relative.parts[1:] == (target, "skills", link.name))
+
+
+def retire_links(root, targets, home):
+    """Retire this checkout's legacy links after native plugins are verified."""
+    pending = []
+    for target in dict.fromkeys(targets):
+        if target not in HARNESSES:
+            raise PortError("Unsupported install target: " + target)
+        directory = home / ("." + target) / "skills"
+        for parent in (directory.parent, directory):
+            if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
+                raise PortError("Preserve and inspect the foreign skills location: " + str(parent))
+        if directory.exists():
+            pending.extend(link for link in directory.iterdir() if owned_legacy_link(root, link, target))
+    # All targets were inspected before removing the first link. Immutable
+    # releases and foreign skills remain in place, including dangling links.
+    for link in pending:
+        link.unlink()
+    return {"status": "legacy_links_retired", "targets": list(dict.fromkeys(targets)),
+            "removed_owned_links": len(pending)}
 
 
 def install(root, targets, home):
@@ -279,16 +432,6 @@ def install(root, targets, home):
     changes = []
     stale = []
 
-    def owned(link, target):
-        if not link.is_symlink():
-            return False
-        try:
-            relative = Path(os.readlink(link)).relative_to(root / ".cache/installed")
-        except ValueError:
-            return False
-        return (len(relative.parts) == 4 and re.fullmatch(r"[0-9a-f]{64}", relative.parts[0])
-                and relative.parts[1:] == (target, "skills", link.name))
-
     for target in targets:
         source = release / target / "skills"
         destination = home / ("." + target) / "skills"
@@ -296,13 +439,13 @@ def install(root, targets, home):
             skill = source / name
             link = destination / name
             if link.exists() or link.is_symlink():
-                if not owned(link, target):
+                if not owned_legacy_link(root, link, target):
                     raise PortError("Existing skill is not owned by this port: " + str(link))
             if not link.is_symlink() or os.readlink(link) != str(skill):
                 changes.append((link, skill))
         if destination.exists():
             for link in destination.iterdir():
-                if owned(link, target) and link.name not in names:
+                if owned_legacy_link(root, link, target) and link.name not in names:
                     stale.append(link)
     release.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".install-", dir=release.parent) as temporary:
@@ -449,10 +592,14 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("bake")
     commands.add_parser("build")
-    commands.add_parser("validate")
-    installer = commands.add_parser("install")
-    installer.add_argument("--target", action="append", choices=HARNESSES, required=True)
-    installer.add_argument("--home", type=Path, default=Path.home())
+    validator = commands.add_parser("validate")
+    validator.add_argument("--tracked", action="store_true", help="Require reviewed publication bytes and modes in the Git index")
+    versioner = commands.add_parser("bump-version")
+    versioner.add_argument("--version", help="A newer MAJOR.MINOR.PATCH version; defaults to the next patch")
+    for name in ("install", "retire-links"):
+        installer = commands.add_parser(name)
+        installer.add_argument("--target", action="append", choices=HARNESSES, required=True)
+        installer.add_argument("--home", type=Path, default=Path.home())
     for name in ("check", "prepare-sync"):
         command = commands.add_parser(name)
         command.add_argument("--source")
@@ -465,9 +612,13 @@ def main():
         elif args.command == "build":
             result = build(ROOT)
         elif args.command == "validate":
-            result = validate(ROOT)
+            result = validate(ROOT, tracked=args.tracked)
+        elif args.command == "bump-version":
+            result = bump_version(ROOT, args.version)
         elif args.command == "install":
             result = install(ROOT, list(dict.fromkeys(args.target)), args.home.expanduser().resolve())
+        elif args.command == "retire-links":
+            result = retire_links(ROOT, list(dict.fromkeys(args.target)), args.home.expanduser().resolve())
         elif args.command == "check":
             result = check(ROOT, args.source, args.ref)
         else:

@@ -53,6 +53,13 @@ class PortTests(unittest.TestCase):
             git(root, "config", "user.name", "Test")
             git(root, "config", "user.email", "test@example.invalid")
         self.write(self.source / "pstack/LICENSE", "Original MIT license\n")
+        self.write(self.source / "pstack/plugin.json", json.dumps({
+            "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+            "name": "pstack", "version": "0.15.25", "description": "Original workflow.",
+            "author": {"name": "Lauren Tan"}, "license": "MIT", "keywords": ["pstack"],
+            "homepage": "https://github.com/cursor/plugins/tree/main/pstack",
+        }))
+        self.write(self.source / "pstack/agents/reviewer.md", "Cursor-only model and tool assumptions.\n")
         self.write(self.source / "pstack/docs/guide.md", "The original guide.\n")
         self.write(self.source / "pstack/skills/example/SKILL.md", (
             "---\nname: Original Name\ndescription: A specific workflow.\n"
@@ -79,6 +86,7 @@ class PortTests(unittest.TestCase):
         self.write(self.root / BAKING / "port/PORT.md", "Use the live harness and Sonnet 5.5.\n")
         self.write(self.root / BAKING / "port/models.md", "interrogate reviewers: inherit-parent, claude-sonnet-5-5\n")
         self.write(self.root / BAKING / "port/setup-pstack.md", "# Portable setup\n\nRead the models file.\n")
+        self.write(self.root / BAKING / "release.json", json.dumps({"version": "0.1.0"}))
         self.write(self.root / ".gitignore", ".cache/\n.worktrees/\n")
         (self.root / BAKING / "scripts").mkdir()
         shutil.copy2(SCRIPT, self.root / BAKING / "scripts/pstack.py")
@@ -135,6 +143,107 @@ class PortTests(unittest.TestCase):
         for harness in ("codex", "claude"):
             self.assertTrue((self.root / harness / "port-manifest.json").is_file())
         self.assertFalse((self.root / "dist").exists())
+
+    def test_native_plugin_ids_versions_and_marketplaces_use_the_baked_packages(self):
+        self.port.bake(self.root)
+        for harness in ("codex", "claude"):
+            with self.subTest(harness=harness):
+                portable = json.loads((self.root / harness / "plugin.json").read_text())
+                native = json.loads((self.root / harness / ("." + harness + "-plugin/plugin.json")).read_text())
+                for manifest in (portable, native):
+                    self.assertEqual(manifest["name"], "starch-rival")
+                    self.assertEqual(manifest["version"], "0.1.0")
+                    self.assertEqual(manifest["author"]["name"], "raiscan")
+                    self.assertEqual(manifest["license"], "MIT")
+                provenance = portable["extensions"]["com.github.raiscan.starch-rival"]["upstream"]
+                self.assertEqual(provenance["name"], "pstack")
+                self.assertEqual(provenance["author"]["name"], "Lauren Tan")
+                self.assertEqual(provenance["version"], "0.15.25")
+                self.assertEqual(provenance["commit"], git(self.module, "rev-parse", "HEAD"))
+                self.assertEqual(native["skills"], "./skills/")
+                self.assertTrue((self.root / harness / "agents/reviewer.md").is_file())
+                if harness == "claude":
+                    self.assertEqual(native["agents"], [])
+                catalog = json.loads((self.root / self.port.MARKETPLACES[harness]).read_text())
+                self.assertEqual(catalog["name"], "starch-rival")
+                entry, = catalog["plugins"]
+                self.assertEqual(entry["name"], "starch-rival")
+                self.assertNotIn("version", entry)
+                if harness == "codex":
+                    self.assertEqual(entry["source"], {"source": "local", "path": "./codex"})
+                    self.assertEqual(entry["policy"], {"installation": "AVAILABLE", "authentication": "ON_INSTALL"})
+                else:
+                    self.assertEqual(entry["source"], "./claude")
+        self.port.validate(self.root)
+
+    def test_version_bump_invalidates_bundles_until_the_release_is_rebaked(self):
+        self.port.bake(self.root)
+        previous = self.port.fingerprint(self.root)
+        result = self.port.bump_version(self.root)
+        self.assertEqual(result["previous_version"], "0.1.0")
+        self.assertEqual(result["version"], "0.1.1")
+        self.assertNotEqual(self.port.fingerprint(self.root), previous)
+        with self.assertRaisesRegex(self.port.PortError, "stale"):
+            self.port.validate(self.root)
+        self.port.bake(self.root)
+        self.assertEqual(self.port.validate(self.root)["version"], "0.1.1")
+        self.assertEqual(self.port.bump_version(self.root, "1.0.0")["version"], "1.0.0")
+        for invalid in ("1.0.0", "0.9.9", "v2.0.0", "2.0", "2.00.0", "2.0.0-beta"):
+            with self.subTest(invalid=invalid), self.assertRaises(self.port.PortError):
+                self.port.bump_version(self.root, invalid)
+        self.assertEqual(self.port.read_release(self.root), {"version": "1.0.0"})
+
+    def test_release_schema_and_generated_manifest_tampering_are_rejected(self):
+        release = self.root / BAKING / "release.json"
+        for invalid in ({"version": "01.0.0"}, {"version": 1}, {"version": "1.0.0", "extra": True}, []):
+            release.write_text(json.dumps(invalid))
+            with self.subTest(invalid=invalid), self.assertRaises(self.port.PortError):
+                self.port.read_release(self.root)
+        release.write_text(json.dumps({"version": "0.1.0"}))
+        self.port.bake(self.root)
+        paths = [self.root / harness / relative for harness in ("codex", "claude")
+                 for relative in ("plugin.json", "." + harness + "-plugin/plugin.json", "port-manifest.json")]
+        paths.extend(self.root / path for path in self.port.MARKETPLACES.values())
+        for path in paths:
+            before = path.read_text()
+            changed = json.loads(before)
+            changed["version"] = "999.0.0"
+            path.write_text(json.dumps(changed))
+            with self.subTest(path=path), self.assertRaises(self.port.PortError):
+                self.port.validate(self.root)
+            path.write_text(before)
+        self.port.validate(self.root)
+
+    def test_tracked_validation_matches_index_inventory_bytes_and_modes(self):
+        self.port.bake(self.root)
+        with self.assertRaisesRegex(self.port.PortError, "index inventory"):
+            self.port.validate(self.root, tracked=True)
+        git(self.root, "add", ".")
+        self.port.validate(self.root, tracked=True)
+        guide = self.root / "codex/docs/guide.md"
+        git(self.root, "update-index", "--chmod=+x", "codex/docs/guide.md")
+        with self.assertRaisesRegex(self.port.PortError, "index bytes or mode"):
+            self.port.validate(self.root, tracked=True)
+        git(self.root, "update-index", "--chmod=-x", "codex/docs/guide.md")
+        old_oid = git(self.root, "hash-object", "-w", str(self.root / "codex/LICENSE"))
+        git(self.root, "update-index", "--cacheinfo", "100644," + old_oid + ",codex/docs/guide.md")
+        with self.assertRaisesRegex(self.port.PortError, "index bytes or mode"):
+            self.port.validate(self.root, tracked=True)
+        git(self.root, "add", str(guide))
+        self.port.validate(self.root, tracked=True)
+
+    def test_tracked_validation_catches_support_files_hidden_by_gitignore(self):
+        self.bake_and_commit()
+        self.write(self.source / "pstack/.cache/support.txt", "Required reference, despite its directory name.\n")
+        self.commit(self.source)
+        candidate = Path(self.port.prepare_sync(self.root)["worktree"])
+        self.port.bake(candidate)
+        git(candidate, "add", ".")
+        self.port.validate(candidate)
+        with self.assertRaisesRegex(self.port.PortError, "missing:.*support.txt"):
+            self.port.validate(candidate, tracked=True)
+        git(candidate, "add", "-f", "codex/.cache/support.txt", "claude/.cache/support.txt")
+        self.port.validate(candidate, tracked=True)
 
     def test_fingerprint_is_independent_of_the_runtime_yaml_version(self):
         before = self.port.fingerprint(self.root)
@@ -218,6 +327,44 @@ class PortTests(unittest.TestCase):
             self.assertEqual(link.resolve().parent.parent.parent.parent, self.root / ".cache/installed")
             self.assertEqual(link.resolve().parts[-3:], (harness, "skills", "example"))
         self.assertEqual((self.home / ".codex/skills/unrelated/SKILL.md").read_text(), "User skill\n")
+
+    def test_retire_links_removes_only_this_checkouts_owned_legacy_symlinks(self):
+        self.bake_and_commit()
+        self.port.install(self.root, ["codex", "claude"], self.home)
+        self.write(self.home / ".codex/skills/user/SKILL.md", "Keep user skill\n")
+        self.write(self.root / ".cache/installed" / ("0" * 64) / "codex/skills/old/SKILL.md", "Old release\n")
+        (self.home / ".codex/skills/old").symlink_to(
+            self.root / ".cache/installed" / ("0" * 64) / "codex/skills/old")
+        foreign_links = {
+            "other-checkout": self.base / "another/.cache/installed" / ("0" * 64) / "codex/skills/other-checkout",
+            "wrong-name": self.root / ".cache/installed" / ("0" * 64) / "codex/skills/example",
+            "invalid-id": self.root / ".cache/installed/not-a-snapshot/codex/skills/invalid-id",
+            "other-harness": self.root / ".cache/installed" / ("0" * 64) / "claude/skills/other-harness",
+        }
+        for name, target in foreign_links.items():
+            (self.home / ".codex/skills" / name).symlink_to(target)
+        result = self.port.retire_links(self.root, ["codex", "claude"], self.home)
+        self.assertEqual(result["removed_owned_links"], 5)
+        for harness in ("codex", "claude"):
+            for name in ("example", "setup-pstack"):
+                self.assertFalse((self.home / ("." + harness) / "skills" / name).is_symlink())
+        for name, target in foreign_links.items():
+            self.assertEqual(os.readlink(self.home / ".codex/skills" / name), str(target))
+        self.assertEqual((self.home / ".codex/skills/user/SKILL.md").read_text(), "Keep user skill\n")
+        self.assertTrue((self.root / ".cache/installed" / ("0" * 64) / "codex/skills/old/SKILL.md").is_file())
+        self.assertEqual(self.port.retire_links(self.root, ["codex", "claude"], self.home)["removed_owned_links"], 0)
+
+    def test_retire_links_preflights_all_targets_before_removing_links(self):
+        self.bake_and_commit()
+        self.port.install(self.root, ["codex"], self.home)
+        (self.home / ".claude").mkdir()
+        foreign = self.base / "foreign-skills"
+        foreign.mkdir()
+        (self.home / ".claude/skills").symlink_to(foreign)
+        with self.assertRaisesRegex(self.port.PortError, "foreign skills location"):
+            self.port.retire_links(self.root, ["codex", "claude"], self.home)
+        self.assertTrue((self.home / ".codex/skills/example").is_symlink())
+        self.assertTrue((self.home / ".claude/skills").is_symlink())
 
     def test_install_preflights_every_target_before_changing_any_links(self):
         self.bake_and_commit()

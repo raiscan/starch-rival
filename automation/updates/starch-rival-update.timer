@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for published Starch Rival updates hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=2m
+Unit=starch-rival-update.service
+
+[Install]
+WantedBy=timers.target

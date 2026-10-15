@@ -1,0 +1,24 @@
+{
+  "name": "starch-rival",
+  "version": "0.1.0",
+  "description": "Starch Rival: an unofficial port of Lauren Tan (poteto)'s pstack workflows.",
+  "author": {
+    "name": "raiscan",
+    "url": "https://github.com/raiscan"
+  },
+  "homepage": "https://github.com/raiscan/starch-rival",
+  "repository": "https://github.com/raiscan/starch-rival",
+  "license": "MIT",
+  "keywords": [
+    "starch-rival",
+    "pstack",
+    "poteto-mode",
+    "workflow",
+    "principles",
+    "agent-style",
+    "subagents",
+    "unslop"
+  ],
+  "skills": "./skills/",
+  "agents": []
+}

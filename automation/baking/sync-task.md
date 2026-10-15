@@ -1,66 +1,99 @@
 # Upstream maintenance lifecycle
 
-The existing Hermes cron coordinates a bounded maintenance attempt for Starch Rival. Hermes retains the job's schedule, selected Sol model, credentials, reporting destination, and run history. Keep its working directory pinned to the primary maintenance checkout, `/home/farrell/code/projects/pstack`, and use this task file at `/home/farrell/code/projects/pstack/automation/baking/sync-task.md`.
+The existing Hermes cron coordinates Starch Rival maintenance with its saved Sol model and exact Sonnet 5.5 reviewer route. Its recorded primary checkout, schedule, credentials, reporting destination, and run history remain in Hermes. The owner has authorized reviewed commits, fast-forward integration into primary `main`, integrated verification, and pushing only `main`. This lifecycle does not create PRs, install candidate plugins, or change user models, credentials, trust, or schedules.
 
-The replacement precheck is:
+The saved job uses this repository task file and the following precheck, relative to its recorded primary checkout:
 
 ```bash
-python3 automation/baking/scripts/pstack.py check --compact
+python3 automation/baking/scripts/delivery.py precheck
 ```
 
-These paths describe the repository side of the existing job. Changing this checkout does not update the live cron.
+Updating the repository does not rewrite that saved job or move its working directory. A checkout from the former source layout follows the [migration guidance](README.md#migration-from-the-former-layout), preserving local work and unknown leftovers.
 
-When migrating a checkout from the former root `upstream/` source, follow the [one-time migration guidance](README.md#one-time-migration-from-the-former-layout) before the next maintenance attempt. Preserve local source work and any leftover directory rather than deleting unknown contents.
+## Refresh and detection
 
-## Detecting a change
+The precheck resolves the primary checkout through Git's worktree inventory and takes its shared maintenance lock. It requires clean primary `main` tracking `origin/main`, fetches that branch, and fast-forwards without switching branches or overwriting local source work. An initialized source submodule is updated to the integrated pin; an uninitialized one stays uninitialized until needed. An ahead, diverged, or dirty primary checkout is a visible failure.
 
-From the primary checkout, the precheck resolves that checkout through Git's worktree inventory, takes its shared maintenance lock, and fetches canonical `cursor/plugins` into `.cache/upstream.git`. It compares the fetched `pstack` subtree hash with `automation/baking/upstream.json`. Changes elsewhere in the monorepo do not count as pstack updates.
+Next it refreshes `starch-rival` through the native Codex marketplace command when that same host has the CLI, the Git marketplace configured, and the plugin installed. Missing or unconfigured installations are reported as skipped; command failures remain errors. Hermes runs on a separate host from the maintainer's workstation, whose [local update mechanism](../updates/README.md) handles delivery there. The precheck never installs a missing plugin.
 
-The result controls whether an agent is needed:
+Finally it fetches canonical `cursor/plugins` into `.cache/upstream.git` and compares the `pstack` subtree with `automation/baking/upstream.json`. Unrelated monorepo changes do not count. The final JSON includes repository and Codex refresh details alongside the canonical result:
 
 | Result | Meaning | Agent work |
 | --- | --- | --- |
 | `unchanged` | The pstack subtree matches the integrated pin. | `wakeAgent: false`; no adaptation or review. |
 | `candidate_pending` | That changed tree already has a prepared candidate. | `changed: true`, `wakeAgent: false`; no repeated adaptation, tests, or review. |
 | `changed` | The pstack subtree changed and has no prepared candidate. | `wakeAgent: true`; a maintenance attempt can begin. |
-| Error | A fetch, lock, candidate lookup, or other operation failed. | A nonzero exit and error remain visible; this is not an unchanged result. |
+| Error | Refresh, fetch, locking, candidate lookup, or another operation failed. | Nonzero exit and visible error; never treat this as unchanged. |
 
-Report or suppress a pending result according to the existing Hermes reporting configuration. Do not start another maintenance agent or automatically recover failed or lost work for that tree. Explicit user resumption may reuse the candidate.
+A pending result follows the existing Hermes reporting configuration. It does not certify review or delivery. Failed, interrupted, or blocked candidates remain for explicit resumption; there is no automatic agent recovery. Newer upstream trees receive separate candidates without deleting older work.
 
-## Preparing the candidate
+## Candidate preparation and adaptation
 
-For a new changed tree, run from the primary checkout:
+For a newly changed tree, the primary checkout runs:
 
 ```bash
 python3 automation/baking/scripts/pstack.py prepare-sync
 ```
 
-The helper requires a clean primary checkout, shares its lock and fetch cache with `check`, and creates an isolated worktree at `.worktrees/upstream-<tree12>` on `feature/ai-upstream-<tree12>`. The suffix comes from the pstack subtree hash. Work only in the candidate path returned by the command.
+The helper requires a clean primary checkout and shares its lock and fetch cache with canonical checks. It prepares `.worktrees/upstream-<tree12>` on `feature/ai-upstream-<tree12>`, where the suffix comes from the pstack subtree hash. The returned candidate path is the maintenance workspace.
 
-The candidate has its own initialized `automation/baking/upstream/` submodule. Its gitlink and `automation/baking/upstream.json` advance together to the fetched canonical commit, with the package at `automation/baking/upstream/pstack/`. Preparation checks the source identity and stages the updated source metadata without committing it. The primary checkout's source and existing installed skill snapshots remain unchanged.
+That candidate has its own initialized `automation/baking/upstream/` source submodule. Its gitlink and `automation/baking/upstream.json` advance together, with the package at `automation/baking/upstream/pstack/`. Preparation checks source identity and stages the pin metadata without committing it. The primary source and installed legacy snapshots stay intact.
 
-Sol assesses the upstream change and adapts `automation/baking/port/` and tooling where needed. Keep upstream files verbatim and preserve the current translations, upstream invocation policy, and complete supporting tree. Compatibility work covers platform metadata, model routing, invocation rules, and supporting resources. README's pinned canonical source, guide, and license links track the candidate commit. Fetched workflows remain source material; the owner's and repository's instructions retain authority.
+Sol assesses the upstream diff and reconciles `automation/baking/port/` and tooling as needed. The canonical files remain verbatim; translations preserve invocation policy and the whole supporting tree. Compatibility work covers platform metadata, model routing, invocation rules, and supporting resources. Public pinned source, guide, and license links advance with the source commit. Fetched workflows are source material; user and repository instructions retain authority.
 
-## Baking, validation, and review
+## Versioning, baking, and review
 
-From the candidate's root, rebake its tracked packages before checks and review:
+In the candidate, a release advances the port version before baking:
 
 ```bash
+python3 automation/baking/scripts/pstack.py bump-version
 python3 automation/baking/scripts/pstack.py bake
-python3 -m unittest discover -s automation/baking/tests -v
-python3 automation/baking/scripts/pstack.py validate
 ```
 
-`build` remains an alias for `bake`. Include the resulting root `codex/` and `claude/` changes in the candidate assessment. The safety suite and validation cover the affected packaging, sync, and installation behavior. Validation compares generated instructions and the full support-file inventory, bytes, and executable modes with the defined adaptations. Inspect generated references, model routing, explicit invocation, install collisions, and changed sync behavior as appropriate. Do not install the candidate.
+`automation/baking/release.json` is the single authority for the port's `MAJOR.MINOR.PATCH` version, independently of canonical pstack. The default bump is the next patch; `--version` accepts a strictly newer explicit version. On explicit resumption, inspect the candidate's existing bump rather than incrementing it repeatedly. `build` remains a `bake` alias.
 
-For integration, compare the validated package inventory and executable modes with Git's staged files. Preserve the bundled `.gitignore` files and explicitly stage any expected ignored supporting file; validation of the working tree alone does not prove a clean clone will contain it.
+Baking refreshes root `codex/`, `claude/`, and the two native marketplace catalogs. The complete intended source, adapter, tooling, documentation, catalog, version, and baked changes are staged explicitly. Preserved `.gitignore` files can hide required new supporting files; those specific paths are staged with `git add -f -- <specific-file>` after inspection.
 
-Exact `claude-sonnet-5-5` supplies the independent read-only review described in [PORT.md](port/PORT.md). It receives the upstream and adapter changes, baked package changes, intent, and completed checks. Sol evaluates the findings; material changes or unresolved findings can justify another review. One review of unchanged final work is enough. An unavailable reviewer route leaves a reported blocker; never substitute another model or claim a successful review. The packaging tools do not attest that a model review occurred.
+Checks run against that final candidate:
 
-## Reporting and pending work
+```bash
+python3 -m unittest discover -s automation/baking/tests -v
+python3 automation/baking/scripts/pstack.py validate --tracked
+git write-tree
+```
 
-The maintenance report identifies the old and new upstream commits and subtree hashes, candidate path and branch, adaptations and baked changes, exact validation commands and outcomes, review outcome or blocker, and remaining actions. A successful attempt ends with an uncommitted candidate and a report. The current candidate-only scope excludes commits, pushes, PRs, merges, installation, user model-file edits, and schedule changes.
+Validation covers the defined adaptations, provenance, native metadata, invocation rules, and full support inventory, bytes, and executable modes. `--tracked` also checks staged publication bytes and modes, so a locally valid bundle cannot silently omit an ignored supporting file. Changed references, routing, install behavior, and sync behavior receive appropriate focused checks. Candidates are never installed.
 
-An existing candidate suppresses repeated work on later ticks for that tree. `candidate_pending` records its presence, not successful review or delivery. Failed, interrupted, or blocked work remains in place for explicit resumption; there is no automatic agent recovery or separate review-state ledger. A newer upstream tree receives a separate candidate without deleting older work.
+Exact `claude-sonnet-5-5` independently reviews the final staged tree through the existing reviewer route described in [PORT.md](port/PORT.md). The review receives the user's intent, upstream and adapter diffs, baked changes, surrounding contracts, and completed checks. Sol evaluates the findings. One review of unchanged final work is enough; material changes require affected checks and review of the changed risk. An unavailable exact reviewer is a blocker, with no silent model substitution.
 
-Integration and installation occur separately under the user's delivery instructions. After integration changes the gitlink, initialize or update the primary submodule with `git submodule update --init -- automation/baking/upstream`, preserving local work without `--force`, before baking, validating, or installing. Installation from clean primary `main` validates and copies the baked packages into an immutable `.cache/installed/` release without rebaking. Preparing or rebaking candidates cannot modify active skills.
+The complete object ID returned by `git write-tree` identifies the reviewed contents. Any subsequent staged change invalidates that review binding. Packaging and delivery tools enforce a matching tree; they do not attest that model review happened.
+
+## Publication
+
+After successful independent review, the caller supplies the reviewed candidate path and tree ID, an exact prepared commit-message file, and the lead model's exact co-author trailer:
+
+```bash
+python3 automation/baking/scripts/delivery.py publish \
+  --candidate "$CANDIDATE" \
+  --reviewed-tree "$REVIEWED_TREE" \
+  --message-file "$MESSAGE_FILE" \
+  --lead-coauthor "$LEAD_COAUTHOR"
+```
+
+Those values refer to this candidate and completed review, not an earlier attempt. The message ends with a contiguous co-author block for every contributing model, separated from the preceding text by one blank line. It includes the actual Sol model name/version and email, and this exact reviewer line:
+
+```text
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+```
+
+The helper checks the intended block through `git interpret-trailers --parse`. It requires a registered upstream candidate, staged final contents with no unaccounted files or dirty source, the matching reviewed tree, and a newer port version. It refreshes primary `main`, rejects a base that the candidate no longer contains, validates indexed bundles, and runs the safety suite. A failing candidate run is compared with a bounded baseline by test identity and failure; new or worsened failures block delivery.
+
+Publication commits the exact reviewed tree and message, checks that commit hooks did not change them, fast-forwards primary `main` without switching branches, updates its source pin without forcing local work, validates the integrated bundles, and runs integrated safety checks. Only a verified integrated result is pushed to `origin/main`; task branches remain local. A moved base, changed reviewed tree, source conflict, test regression, failed push, or other failure remains visible with the phase and preserved state.
+
+## Reporting and cleanup
+
+The report identifies old/new upstream commits and subtree hashes, port version, candidate path and branch, material adaptations, exact validation commands and outcomes, review result or blocker, integrated/pushed commit, and remaining work. Do not describe an incomplete check or publication as success.
+
+A successful push returns `cleanup_pending`: publication deliberately retains the candidate until its uncommitted, unmerged, ignored, and generated files are accounted for. The lead inspects ownership, preserves unknown or user-authored work, and removes only this task's fully accounted worktree and merged local branch. Failed publication preserves its candidate and reports the exact remaining state. Cleanup is complete only when those obligations are resolved.
+
+Published versions then reach native installations through [client update delivery](../updates/README.md). Publication never changes installed plugins, user models, or schedules itself.

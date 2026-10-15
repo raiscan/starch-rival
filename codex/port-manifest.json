@@ -6,7 +6,8 @@
     "commit": "e5136d82418d2db3165ea1050d17577cd618cc05",
     "tree": "de8e53ebbeca0fe9351e950095e720655da08349"
   },
-  "input_sha256": "41737abd352142b0dce1219f25917bd778227173c80235d0240e6178e379d6d4",
+  "input_sha256": "a8f0ad3d50e344747bbdc32124baf53f2d5d92b1fb590a66d88d177a477515c4",
   "harness": "codex",
-  "skills": 54
+  "skills": 54,
+  "version": "0.1.0"
 }

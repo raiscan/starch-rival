@@ -1,0 +1,8 @@
+[Unit]
+Description=Refresh the installed Starch Rival Codex plugin
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h
+ExecStart=%h/.local/bin/codex plugin marketplace upgrade starch-rival --json
+TimeoutStartSec=120

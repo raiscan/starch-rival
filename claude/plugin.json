@@ -1,15 +1,17 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-  "name": "pstack",
-  "version": "0.15.25",
-  "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence.",
+  "name": "starch-rival",
+  "version": "0.1.0",
+  "description": "Starch Rival: an unofficial port of Lauren Tan (poteto)'s pstack workflows.",
   "author": {
-    "name": "Lauren Tan"
+    "name": "raiscan",
+    "url": "https://github.com/raiscan"
   },
-  "homepage": "https://github.com/cursor/plugins/tree/main/pstack",
-  "repository": "https://github.com/cursor/plugins",
+  "homepage": "https://github.com/raiscan/starch-rival",
+  "repository": "https://github.com/raiscan/starch-rival",
   "license": "MIT",
   "keywords": [
+    "starch-rival",
     "pstack",
     "poteto-mode",
     "workflow",
@@ -17,5 +19,22 @@
     "agent-style",
     "subagents",
     "unslop"
-  ]
+  ],
+  "extensions": {
+    "com.github.raiscan.starch-rival": {
+      "upstream": {
+        "repository": "https://github.com/cursor/plugins.git",
+        "ref": "main",
+        "path": "pstack",
+        "commit": "e5136d82418d2db3165ea1050d17577cd618cc05",
+        "tree": "de8e53ebbeca0fe9351e950095e720655da08349",
+        "name": "pstack",
+        "version": "0.15.25",
+        "author": {
+          "name": "Lauren Tan"
+        },
+        "homepage": "https://github.com/cursor/plugins/tree/main/pstack"
+      }
+    }
+  }
 }

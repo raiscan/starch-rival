@@ -1,75 +1,69 @@
 # Bake and maintain Starch Rival
 
-This directory contains the canonical source pin, portability adapters, Python tooling, tests, and instructions used by the existing Hermes maintenance job. The complete translated packages are tracked at the repository root in [codex/](../../codex/) and [claude/](../../claude/). Preserve the current translations and upstream supporting materials when updating them.
+This directory owns the canonical source pin, portability adapters, independent port version, baking and delivery tools, safety tests, and the existing Hermes job's lifecycle. The complete translated packages are tracked at the repository root in [codex/](../../codex/) and [claude/](../../claude/).
 
 ## Source and layout
 
-- [upstream/](upstream/) is the canonical `cursor/plugins` Git submodule; its package is `upstream/pstack/`. Keep source files verbatim.
-- [upstream.json](upstream.json) records the matching canonical commit and pstack subtree hash. Advance it with the gitlink through `prepare-sync`.
-- [port/](port/) contains platform metadata, setup, and model-routing adaptations. Read [PORT.md](port/PORT.md) for the boundaries and exact `claude-sonnet-5-5` reviewer requirement.
-- [scripts/pstack.py](scripts/pstack.py) owns baking, validation, installation, and sync preparation. [tests/](tests/) covers those contracts; [requirements.txt](requirements.txt) contains its Python dependencies.
+- `upstream/` is the canonical `cursor/plugins` Git submodule; its package is `upstream/pstack/`. Keep source files verbatim. GitHub's gitlink opens the [pinned canonical repository](https://github.com/cursor/plugins/tree/e5136d82418d2db3165ea1050d17577cd618cc05).
+- [upstream.json](upstream.json) records that commit and pstack subtree hash. `prepare-sync` advances it with the gitlink in an isolated candidate.
+- [release.json](release.json) owns the Starch Rival semantic version, initially `0.1.0`, independently of canonical pstack's version.
+- [port/](port/) contains platform, setup, and model-routing adaptations. [PORT.md](port/PORT.md) defines the exact `claude-sonnet-5-5` reviewer requirement.
+- [scripts/pstack.py](scripts/pstack.py) bakes, validates, installs legacy snapshots, retires owned legacy links, and prepares source candidates. [scripts/delivery.py](scripts/delivery.py) refreshes primary `main` and publishes agent-reviewed candidates. [tests/](tests/) covers these contracts.
 
-All commands below run from the repository root. Use Python 3.9+, Git, and PyYAML. Install dependencies into your chosen Python environment:
+Maintenance uses Python 3.9+, Git, and [PyYAML](requirements.txt). All command paths below are relative to the repository root:
 
 ```bash
 python3 -m pip install -r automation/baking/requirements.txt
 git submodule update --init -- automation/baking/upstream
 ```
 
-Initialize the submodule in every new task worktree and repeat after integration changes its pin. Preserve local submodule work before updating; do not use `--force`. Baking and validation require the initialized source to match the manifest and gitlink; they never fetch implicitly.
+Initialize the source in each task worktree and repeat after integration moves its pin. Preserve local work without `--force`. Baking and validation require the initialized source to match the manifest and gitlink; they do not fetch implicitly. Native plugin users consume the tracked packages and do not need a source checkout or Python environment.
 
-### One-time migration from the former layout
+### Migration from the former layout
 
-In an existing clone that still has the source at root `upstream/`, inspect `git -C upstream status --porcelain --untracked-files=all --ignored` and preserve any local work first. Before pulling the layout change, deinitialize that clean source with `git submodule deinit -- upstream`. Pull the integrated branch, then initialize `automation/baking/upstream` with the command above. Git keeps the source repository in its module storage while changing the checkout path.
+An older clone may still have root `upstream/`. Before pulling the layout change, inspect `git -C upstream status --porcelain --untracked-files=all --ignored`, preserve local work, and deinitialize that clean source with `git submodule deinit -- upstream`. Pull the integrated branch, then initialize `automation/baking/upstream`. If the change was already pulled, preserve any leftover untracked root `upstream/` outside the checkout before initializing the new path. Unknown contents are never disposable; a leftover directory prevents clean-checkout delivery.
 
-If the layout change was already pulled and left an untracked root `upstream/`, inspect and preserve that directory outside the checkout before initializing the new path. Do not delete unknown contents. A leftover directory makes the primary checkout dirty and prevents candidate preparation or installation.
+## Baking and publication checks
 
-## Refresh and verify the tracked packages
-
-After changing adapters or preparing a new source pin, explicitly refresh both translated packages:
+A release advances the port version before baking and review:
 
 ```bash
+python3 automation/baking/scripts/pstack.py bump-version
 python3 automation/baking/scripts/pstack.py bake
 python3 -m unittest discover -s automation/baking/tests -v
 python3 automation/baking/scripts/pstack.py validate
 ```
 
-`build` remains an alias for `bake`. Review and commit the resulting `codex/` and `claude/` changes with the source/adaptation changes. Validation compares the complete supporting-file inventory, bytes, and executable modes against the source and defined adaptations, including metadata, model routing, explicit invocation, and local references. Preserve upstream invocation policy and the existing translated prose.
+`bump-version` defaults to the next patch; `--version MAJOR.MINOR.PATCH` selects a strictly newer version. `build` remains an alias for `bake`. Baking refreshes `codex/`, `claude/`, and both root native marketplace catalogs. Both plugins identify as `starch-rival@starch-rival`, carry the port version, and preserve canonical attribution and provenance. The Claude manifest registers skills and sets `agents: []`, keeping the verbatim Cursor agent prompts as supporting references.
 
-Before integration, compare the validated package file inventory and executable modes with Git's staged inventory. Bundled upstream `.gitignore` files are preserved, so an expected new supporting file may need an explicit `git add -f -- <specific-file>` to be included. A locally valid package must also be complete in a clean clone.
+Validation compares the instructions, native manifests, provenance, complete supporting inventory, bytes, and executable modes against the source and adaptations. After explicitly staging all intended source, adapter, tooling, documentation, catalog, and baked changes, the publication check is:
 
-For code developed in a worktree, follow the owner's delivery instructions: establish the updated-base full-suite baseline, run the development suite and focused checks, integrate into the main workspace's current branch without switching it, verify the integrated result against the baseline, push that branch, and account for all work before cleanup. Obtain the required independent read-only Sonnet 5.5 review for substantive code or workflow changes. One review of unchanged final work is enough; report an unavailable exact model as a blocker. Packaging tools do not certify that a model review occurred.
+```bash
+python3 automation/baking/scripts/pstack.py validate --tracked
+```
 
-Installation is a separate action from baking:
+That check also matches every expected baked file, marketplace catalog, and release metadata file to Git's index bytes and modes. Preserved upstream `.gitignore` files can hide new supporting files; stage only those required paths explicitly with `git add -f -- <specific-file>`. A locally valid bundle must survive publication and a clean clone.
+
+Exact Sonnet 5.5 independently reviews the final staged contents and completed checks before publication. One review of unchanged final work is enough; an unavailable exact model is a blocker. The reviewed tree comes from `git write-tree`. Tooling compares publication with that tree but cannot attest that the review occurred. [sync-task.md](sync-task.md) gives the existing job's full lifecycle and precise publication command.
+
+## Existing Hermes job
+
+The existing Hermes cron keeps its recorded primary maintenance checkout, selected Sol model, schedule, reviewer access route, credentials, reporting destination, and history. Its repository precheck is:
+
+```bash
+python3 automation/baking/scripts/delivery.py precheck
+```
+
+The precheck fast-forwards clean primary `main` from `origin/main`, refreshes an already-installed native Codex plugin through its configured Git marketplace when available on the same host, then performs the canonical pstack subtree check. Its final JSON retains `wakeAgent`, including `false` for unchanged or pending candidates. Errors remain visible. Hermes runs on another host; [workstation delivery](../updates/README.md) refreshes native installations here.
+
+For a changed tree, `pstack.py prepare-sync` prepares a source candidate; Sol reconciles and versions it, then baking, staging, tests, validation, and exact independent review precede `delivery.py publish`. The owner's authorization covers reviewed commits, fast-forward integration into primary `main`, integrated verification, and pushing only `main`. It does not cover PRs, plugin installation from candidates, or changes to user models, credentials, trust, or schedules. Pending work is preserved for explicit resumption, not retried on every tick. Failures and cleanup still required are reported as remaining work.
+
+## Legacy snapshot installer
+
+The earlier installer remains an explicit fallback:
 
 ```bash
 python3 automation/baking/scripts/pstack.py install --target codex --target claude
 ```
 
-The installer requires the clean primary checkout on `main`, validates the tracked baked packages, and copies them into an immutable `.cache/installed/` release. It never rebakes. Skill links point into that release, with concrete local Markdown references rewritten to absolute paths inside it. Baking or preparing another candidate cannot change active skills. Installation does not modify user models, trust, or the Hermes schedule; conflicting existing skills are reported.
-
-## Existing Hermes job: replacement paths
-
-Keep the already-configured Hermes job pinned to the primary maintenance checkout, `/home/farrell/code/projects/pstack`. The owner can pass these repository references to Hermes to replace the paths from the former layout:
-
-```text
-Working directory: /home/farrell/code/projects/pstack
-Precheck: python3 automation/baking/scripts/pstack.py check --compact
-Task instructions: /home/farrell/code/projects/pstack/automation/baking/sync-task.md
-```
-
-The task uses these commands from the appropriate checkout:
-
-```bash
-python3 automation/baking/scripts/pstack.py prepare-sync
-# In the candidate path returned by prepare-sync:
-python3 automation/baking/scripts/pstack.py bake
-python3 -m unittest discover -s automation/baking/tests -v
-python3 automation/baking/scripts/pstack.py validate
-```
-
-These are replacement paths for the existing job. Its cron identity, schedule, selected Sol model, credentials, reporting destination, and run history remain in Hermes; no cron update or other setup is performed by this repository change. Read [sync-task.md](sync-task.md) for precheck handling, candidate preparation, review, and reporting.
-
-Both maintenance commands resolve the primary checkout through Git's worktree inventory and share its lock, `.cache/upstream.git`, and candidate directory. They compare only the canonical pstack subtree. Preparation initializes and advances only the candidate's source pin, preserving the primary checkout's submodule and installed skills. `candidate_pending` suppresses repeated agent work for an already-prepared tree; it does not certify a successful review or recover an interrupted agent. Explicit resumption may reuse that candidate. Newer upstream trees receive separate candidates without deleting older work.
-
-The current Hermes scope ends with an uncommitted candidate and a report. Commits, pushes, PRs, merges, installation, user model-file edits, and schedule changes require their own authorized scope. Repository integration follows the owner's delivery instructions; successful candidate review alone does not publish or install an update.
+It requires clean primary `main`, validates the baked packages without rebaking, and copies them into immutable `.cache/installed/` snapshots. Owned skill links point there, with concrete local Markdown references rewritten to absolute paths. Native plugin updaters do not update these links. After verifying native installation, `pstack.py retire-links --target codex --target claude` removes only this checkout's legacy links; immutable snapshots, user directories, and foreign links remain intact. Baking and candidate preparation cannot mutate active legacy skills.
