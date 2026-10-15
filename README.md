@@ -6,19 +6,27 @@ Starch Rival is an unofficial compatibility port of [pstack](https://github.com/
 
 The current snapshot contains 54 skills. The original source stays verbatim; the adapter handles platform metadata, model routing, setup, and Cursor-specific integrations. Starch Rival is independently maintained and is not an official pstack distribution.
 
-The source snapshot and its commit/tree identity live in [`upstream/`](upstream/) and [`upstream.json`](upstream.json). Our changes live in [`port/`](port/). Read the [adapter](port/PORT.md) for exact differences and the [upstream guide](upstream/docs/guide/README.md) for the workflows.
+[`upstream/`](https://github.com/cursor/plugins/tree/e5136d82418d2db3165ea1050d17577cd618cc05) is a Git submodule of the canonical [`cursor/plugins`](https://github.com/cursor/plugins) repository. GitHub shows its pinned commit in this repository's file list and links to that source. The pstack package lives at `upstream/pstack/`; [`upstream.json`](upstream.json) records the matching commit and pstack subtree hash. Our changes live in [`port/`](port/). Read the [adapter](port/PORT.md) for exact differences and the [pinned upstream guide](https://github.com/cursor/plugins/blob/e5136d82418d2db3165ea1050d17577cd618cc05/pstack/docs/guide/README.md) for the workflows.
 
 ## Build and install
 
 Use Linux or macOS with Python 3.9+, Git, and [PyYAML](requirements.txt). Clone the repository and create a Python environment:
 
 ```bash
-git clone https://github.com/raiscan/starch-rival.git
+git clone --recurse-submodules https://github.com/raiscan/starch-rival.git
 cd starch-rival
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
+
+For an existing clone, initialize the pinned source before building:
+
+```bash
+git submodule update --init -- upstream
+```
+
+Run that command again after pulling an update that changes the submodule pin, and in each new task worktree before building. Preserve any local submodule work before updating; do not use `--force`. Build and validation commands require the initialized, unchanged pin and never fetch source implicitly.
 
 Check and build both variants:
 
@@ -47,11 +55,11 @@ python3 scripts/pstack.py check
 python3 scripts/pstack.py prepare-sync
 ```
 
-Both maintenance commands resolve the primary checkout through Git's worktree inventory and share its lock, cache, and candidate directory, even when launched from a scheduler-created worktree. Pin the scheduled job to that primary maintenance checkout. `check` compares the canonical pstack subtree, so unrelated monorepo changes are a no-op. `prepare-sync` creates or reuses a `feature/ai-upstream-<tree12>` branch in `.worktrees/upstream-<tree12>` and updates only the upstream snapshot and manifest. It leaves the candidate uncommitted for an agent to reconcile and review. Fetching does not update installed skills.
+Both maintenance commands resolve the primary checkout through Git's worktree inventory and share its lock, cache, and candidate directory, even when launched from a scheduler-created worktree. Pin the scheduled job to that primary maintenance checkout. `check` compares the canonical pstack subtree, so unrelated monorepo changes are a no-op. `prepare-sync` creates or reuses a `feature/ai-upstream-<tree12>` branch in `.worktrees/upstream-<tree12>`, initializes that candidate's submodule, and updates its pin and manifest together. It leaves the candidate uncommitted for an agent to reconcile and review. The primary checkout's submodule and installed skills stay at their existing pins.
 
 When the changed upstream tree already has a valid prepared candidate, `check` returns `candidate_pending`, `changed: true`, `wakeAgent: false`, and its path. The scheduled job reports or suppresses that pending result instead of commissioning the same adaptation, tests, and review again. This does not prove review succeeded or restart a failed agent; explicitly resume that candidate when needed. A newer upstream tree gets a separate candidate, preserving the older one.
 
-The [sync task](automation/sync-task.md) gives an agent the bounded update procedure. The [automation options](automation/README.md) explain existing Claude, Codex, and Hermes scheduling rather than adding a daemon. This repository is published at [raiscan/starch-rival](https://github.com/raiscan/starch-rival); the upstream pin continues to track canonical pstack. Building or installing does not activate a scheduler or grant an agent permission to publish updates.
+The [sync task](automation/sync-task.md) gives an agent the bounded update procedure. The [automation options](automation/README.md) explain existing Claude, Codex, and Hermes scheduling rather than adding a daemon; the [Hermes setup prompt](automation/hermes-setup.md) configures one daily, candidate-only job. This repository is published at [raiscan/starch-rival](https://github.com/raiscan/starch-rival); the upstream pin continues to track canonical pstack. Building or installing does not activate a scheduler or grant an agent permission to publish updates.
 
 ## Maintain the port
 
@@ -59,4 +67,4 @@ Edit `port/`, `scripts/`, or `tests/`; regenerate `dist/` rather than editing it
 
 ## License and attribution
 
-[MIT](LICENSE). The pstack workflows, playbooks, agent prompts, and supporting materials are Lauren Tan's work; their [original license](upstream/LICENSE) is preserved in the upstream snapshot. Starch Rival adds the portability adapter, packaging, installation, and sync tooling. Read [PORT.md](port/PORT.md) for the adaptations and local reviewer requirement.
+[MIT](LICENSE). The pstack workflows, playbooks, agent prompts, and supporting materials are Lauren Tan's work; their [original license](https://github.com/cursor/plugins/blob/e5136d82418d2db3165ea1050d17577cd618cc05/pstack/LICENSE) is preserved in the pinned submodule. Starch Rival adds the portability adapter, packaging, installation, and sync tooling. Read [PORT.md](port/PORT.md) for the adaptations and local reviewer requirement.

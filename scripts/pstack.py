@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build/install the local pstack port and stage upstream updates for agent review.
 
-Inputs are upstream.json, the unchanged upstream/ snapshot, and port/ adapters.
+Inputs are upstream.json, the pinned upstream/pstack/ submodule package, and port/ adapters.
 Origin: the 2026-10-15 task to port poteto's pstack with Sonnet 5.5 review.
 Sync preparation never installs a candidate or executes downloaded scripts.
 """
@@ -10,7 +10,6 @@ import argparse
 from contextlib import contextmanager
 import fcntl
 import hashlib
-import io
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -18,7 +17,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tarfile
 import tempfile
 import uuid
 
@@ -83,18 +81,38 @@ def tree_hash(directory):
     return object_hash("tree", b"".join(body for _, body in sorted(entries))).hex()
 
 
+def source_root(root):
+    return root / "upstream" / read_manifest(root)["path"]
+
+
 def source_manifest(root):
     manifest = read_manifest(root)
-    if tree_hash(root / "upstream") != manifest["tree"]:
-        raise PortError("upstream/ differs from its pinned Git tree; reconcile the snapshot first")
+    module = root / "upstream"
+    entry = git(root, "ls-files", "--stage", "--", "upstream").splitlines()
+    expected = "160000 " + manifest["commit"] + " 0\tupstream"
+    if entry != [expected]:
+        raise PortError("The upstream gitlink must match upstream.json; stage the reconciled submodule pin")
+    if git(root, "config", "--file", ".gitmodules", "submodule.upstream.url") != manifest["repository"]:
+        raise PortError("The upstream submodule URL must match upstream.json")
+    if git(root, "config", "--file", ".gitmodules", "submodule.upstream.path") != "upstream":
+        raise PortError("The upstream submodule path must be upstream")
+    if not (module / ".git").exists():
+        raise PortError("Initialize the source with: git submodule update --init -- upstream")
+    if Path(git(module, "rev-parse", "--show-toplevel")).resolve() != module.resolve():
+        raise PortError("Initialize the source with: git submodule update --init -- upstream")
+    if git(module, "rev-parse", "HEAD") != manifest["commit"]:
+        raise PortError("The upstream submodule HEAD differs from upstream.json; preserve local work, then run git submodule update --init -- upstream")
+    if git(module, "rev-parse", "HEAD:" + manifest["path"]) != manifest["tree"]:
+        raise PortError("The manifest subtree must match the pinned upstream commit")
+    if tree_hash(source_root(root)) != manifest["tree"]:
+        raise PortError("upstream/pstack/ differs from its pinned Git tree; reconcile the source first")
     return manifest
 
 
 def fingerprint(root):
     value = hashlib.sha256()
     value.update(yaml.__version__.encode() + b"\0")
-    for directory in ("upstream", "port", "scripts"):
-        base = root / directory
+    for base in (source_root(root), root / "port", root / "scripts"):
         if not base.exists():
             continue
         for path in sorted(base.rglob("*")):
@@ -138,7 +156,7 @@ def build(root):
     for harness in HARNESSES:
         with tempfile.TemporaryDirectory(prefix=".build-", dir=dist) as temporary:
             output = Path(temporary) / harness
-            shutil.copytree(root / "upstream", output)
+            shutil.copytree(source_root(root), output)
             for path in output.rglob("*.md"):
                 path.write_bytes(path.read_bytes().replace(OLD_MODEL_PATH.encode(), MODEL_PATH.encode()))
             shutil.copy2(root / "port/PORT.md", output / "PORT.md")
@@ -182,6 +200,7 @@ def build(root):
 
 def validate(root):
     source_manifest(root)
+    source = source_root(root)
     input_id = fingerprint(root)
     count = 0
     for harness in HARNESSES:
@@ -189,9 +208,9 @@ def validate(root):
         manifest = json.loads((output / "port-manifest.json").read_text())
         if manifest["input_sha256"] != input_id:
             raise PortError("Generated output is stale; rebuild before installing")
-        expected_files = {path.relative_to(root / "upstream") for path in (root / "upstream").rglob("*") if path.is_file()}
+        expected_files = {path.relative_to(source) for path in source.rglob("*") if path.is_file()}
         additions = {Path("PORT.md"), Path("models.md"), Path("port-manifest.json")}
-        for original in sorted((root / "upstream/skills").glob("*/SKILL.md")):
+        for original in sorted((source / "skills").glob("*/SKILL.md")):
             name = original.parent.name
             front, actual_body = split_skill((output / "skills" / name / "SKILL.md").read_text())
             upstream_front, upstream_body = split_skill(original.read_text().replace(OLD_MODEL_PATH, MODEL_PATH))
@@ -215,7 +234,7 @@ def validate(root):
         if actual_files != expected_files | additions:
             raise PortError("Generated support-file inventory differs from the complete upstream package")
         for relative in expected_files:
-            original, generated = root / "upstream" / relative, output / relative
+            original, generated = source / relative, output / relative
             if original.stat().st_mode & 0o111 != generated.stat().st_mode & 0o111:
                 raise PortError("Generated executable mode changed: " + str(relative))
             if relative.parts[0] == "skills" and relative.name == "SKILL.md":
@@ -244,7 +263,7 @@ def install(root, targets, home):
     source_manifest(root)
     input_id = fingerprint(root)
     release = root / ".cache/installed" / input_id
-    names = sorted(path.parent.name for path in (root / "upstream/skills").glob("*/SKILL.md"))
+    names = sorted(path.parent.name for path in (source_root(root) / "skills").glob("*/SKILL.md"))
     changes = []
     stale = []
 
@@ -389,25 +408,6 @@ def check(root, source=None, ref=None):
                 "wakeAgent": changed, "current": current, "latest": latest}
 
 
-def extract_snapshot(payload, destination):
-    destination.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as archive:
-        members = archive.getmembers()
-        for member in members:
-            path = PurePosixPath(member.name)
-            if path.is_absolute() or ".." in path.parts or not (member.isdir() or member.isfile()):
-                raise PortError("Unsupported upstream archive entry: " + member.name)
-        for member in members:
-            path = destination.joinpath(*PurePosixPath(member.name).parts)
-            if member.isdir():
-                path.mkdir(parents=True, exist_ok=True)
-            else:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                with archive.extractfile(member) as body:
-                    path.write_bytes(body.read())
-                path.chmod(member.mode & 0o777)
-
-
 def prepare_sync(root, source=None, ref=None):
     root = maintenance_root(root)
     with sync_lock(root):
@@ -420,16 +420,15 @@ def prepare_sync(root, source=None, ref=None):
         if pending:
             return pending
         candidate, branch = candidate_location(root, latest)
-        payload = git(cache, "archive", latest["commit"] + ":" + latest["path"], binary=True)
-        with tempfile.TemporaryDirectory(prefix="snapshot-", dir=root / ".cache") as temporary:
-            snapshot = Path(temporary) / "upstream"
-            extract_snapshot(payload, snapshot)
-            if tree_hash(snapshot) != latest["tree"]:
-                raise PortError("Downloaded upstream snapshot does not match its Git tree")
-            git(root, "worktree", "add", "-b", branch, str(candidate), "HEAD")
-            shutil.rmtree(candidate / "upstream")
-            shutil.copytree(snapshot, candidate / "upstream")
-            (candidate / "upstream.json").write_text(json.dumps(latest, indent=2) + "\n")
+        git(root, "worktree", "add", "-b", branch, str(candidate), "HEAD")
+        git(candidate, "submodule", "update", "--init", "--depth", "1", "--", "upstream")
+        module = candidate / "upstream"
+        git(module, "fetch", "--quiet", "--no-tags", "--depth=1", "--", str(cache), latest["commit"])
+        git(module, "checkout", "--quiet", "--detach", latest["commit"])
+        git(candidate, "config", "--file", ".gitmodules", "submodule.upstream.url", latest["repository"])
+        (candidate / "upstream.json").write_text(json.dumps(latest, indent=2) + "\n")
+        git(candidate, "add", "--", ".gitmodules", "upstream", "upstream.json")
+        source_manifest(candidate)
         return {"status": "candidate", "wakeAgent": True, "reused": False,
                 "worktree": str(candidate), "branch": branch, "upstream": latest}
 
@@ -460,7 +459,7 @@ def main():
         else:
             result = prepare_sync(ROOT, args.source, args.ref)
         print(json.dumps(result, indent=None if getattr(args, "compact", False) else 2))
-    except (PortError, OSError, ValueError, yaml.YAMLError, tarfile.TarError) as error:
+    except (PortError, OSError, ValueError, yaml.YAMLError) as error:
         print(json.dumps({"status": "error", "error": str(error)}), file=sys.stderr)
         return 1
     return 0

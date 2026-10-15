@@ -2,6 +2,8 @@
 
 Use an existing scheduler to run the [sync task](sync-task.md). Pin the job to the primary maintenance checkout. The deterministic check compares the canonical repository's `pstack` subtree with `upstream.json`; the agent wakes for a new changed tree that lacks a prepared candidate, then reconciles the adapter, runs checks, and obtains Sonnet 5.5 review. Installed skills change only through a separately authorized installation from the clean primary checkout on `main` after integration.
 
+Clone [raiscan/starch-rival](https://github.com/raiscan/starch-rival) with `--recurse-submodules`, or run `git submodule update --init -- upstream` in its primary checkout before the first check/build. The canonical repository is a pinned Git submodule at `upstream/`, and the pstack package lives at `upstream/pstack/`. Build/validation never fetch source automatically. `prepare-sync` initializes and advances the candidate's submodule with its manifest; the primary checkout's source is left alone.
+
 A daily local task fits a development machine that stays awake with its chosen app open. An existing Hermes gateway can own a persistent job with a script precheck. A cloud Claude routine can use [raiscan/starch-rival](https://github.com/raiscan/starch-rival) once repository access and the review route are configured in that environment. These are options, not active jobs.
 
 ## Existing scheduling options
@@ -12,7 +14,7 @@ A daily local task fits a development machine that stays awake with its chosen a
 - **Codex local scheduled tasks**, managed in the desktop app's Scheduled interface, can run against a local project or an isolated worktree. Pin this task's maintenance path to the primary checkout even if Codex creates a fresh execution worktree; it must use the shared primary candidates rather than ephemeral copies. The computer must remain on and the app running for local files. Codex CLI does not provide that schedule-management interface. Select an explicit reviewer route in the task environment; scheduling alone does not supply cross-provider tools. [Official scheduled-task documentation](https://learn.chatgpt.com/docs/automations?surface=app).
 - **Hermes cron** persists through its gateway scheduler and runs isolated agent sessions. Its script precheck supports a final `{"wakeAgent": false}` line to skip the model when nothing changed. Keep the gateway running and verify that the selected Hermes environment can invoke the exact Sonnet 5.5 reviewer; delegation support by itself does not establish model access. [Official cron documentation](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron), [delegation documentation](https://hermes-agent.nousresearch.com/docs/user-guide/features/delegation).
 
-An enabled Hermes scheduler does not imply a Starch Rival job exists. List existing jobs and configure this task separately; a paused polling job for another project is not evidence that the scheduler itself is disabled.
+An enabled Hermes scheduler does not imply a Starch Rival job exists. List existing jobs and configure this task separately; a paused polling job for another project is not evidence that the scheduler itself is disabled. The [Hermes setup prompt](hermes-setup.md) uses Sol, exact Sonnet 5.5 review, and a daily candidate-only job.
 
 ## Activate one bounded job
 
@@ -24,4 +26,4 @@ For Hermes, a precheck wrapper can run `python3 scripts/pstack.py check --compac
 
 Both `check` and `prepare-sync` resolve the repository's primary checkout with `git worktree list` and use one shared lock/cache there. `prepare-sync` reuses `.worktrees/upstream-<tree12>` for an explicit resumption rather than creating a branch per tick. A fetch never installs or integrates a candidate. Only installation from clean primary `main` creates an immutable active snapshot; its absolute local Markdown links keep references inside that snapshot when accessed through skill symlinks.
 
-This repository includes the prompt and preparation tooling. No schedule, service, cloud repository, PR, automatic merge, or recurring worker is created by building or installing it.
+This repository includes the prompts and preparation tooling. No schedule, service, cloud repository, PR, automatic merge, or recurring worker is created by building or installing it.
