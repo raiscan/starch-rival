@@ -1,4 +1,5 @@
 .worktrees/
+.venv/
 .cache/
 dist/
 __pycache__/
