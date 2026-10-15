@@ -1,0 +1,12 @@
+{
+  "upstream": {
+    "repository": "https://github.com/cursor/plugins.git",
+    "ref": "main",
+    "path": "pstack",
+    "commit": "e5136d82418d2db3165ea1050d17577cd618cc05",
+    "tree": "de8e53ebbeca0fe9351e950095e720655da08349"
+  },
+  "input_sha256": "41737abd352142b0dce1219f25917bd778227173c80235d0240e6178e379d6d4",
+  "harness": "codex",
+  "skills": 54
+}

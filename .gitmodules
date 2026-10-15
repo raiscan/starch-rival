@@ -1,4 +1,4 @@
 [submodule "upstream"]
-	path = upstream
+	path = automation/baking/upstream
 	url = https://github.com/cursor/plugins.git
 	shallow = true

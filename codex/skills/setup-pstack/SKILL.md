@@ -1,0 +1,26 @@
+---
+name: setup-pstack
+description: Configure which models pstack uses per role and at what reasoning budget.
+  Detects your available models and writes an always-applied rule that overrides the
+  skill defaults. Use for /setup-pstack, "configure pstack models", "pstack budget",
+  or changing pstack's model choices.
+---
+
+## Local harness adapter
+
+Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, or setup instructions. It also defines this port's Sonnet 5.5 reviewer. User, repository, and live tool instructions take precedence.
+
+# Setup pstack
+
+Configure pstack's role choices in `~/.config/pstack/models.md`. Read the bundled `PORT.md` and `models.md` first. This replaces Cursor's global always-applied rule setup.
+
+1. Discover the current harness's model routes. In T3 use `orchestrator_capabilities`, including its provider instances and configured custom models; the native subagent model list may be incomplete. Otherwise use the available provider's supported model discovery. Confirm that `claude-sonnet-5-5` can be delegated independently. If it cannot, name the missing capability and preserve the pin. Do not choose a substitute or alter authentication/permissions.
+2. Read any existing `~/.config/pstack/models.md`. Overlay its recognized role lines on the bundled defaults. Identify retired role lines separately; do not silently discard unrelated content. An absent file needs no write until the user chooses changes.
+3. Show the effective role choices and explain that panel list lengths set their fan-out. Default code, helper, and prose roles inherit the parent model; arena and architect have parent/Opus arms, and interrogate has parent/Sonnet 5.5 arms. Offer the upstream budget choices `unlimited`, `large`, `medium`, and `small` when effort control is supported, or retain parent/default effort. Translate effort through supported provider controls. Do not append Cursor effort or speed suffixes to an unverified model ID.
+4. Let the user choose changes to roles and budget. Show only detected concrete routes plus `inherit-parent` and `auto`. Keep the requested Sonnet 5.5 reviewer unless the user explicitly changes that requirement. Existing authorization for specific choices is enough; do not ask again solely because setup is a skill.
+5. Validate the proposed table, then write the chosen configuration with the same upstream role labels and a `# budget:` line. Update only pstack's model configuration. Preserve unrelated existing prose unless the user chose a whole-file replacement. Do not write Cursor rules, global instructions, implicit activation rules, project trust settings, credentials, or schedules.
+6. Report the written path, the selected changes, and any unresolved route. Explain that pstack reads the file when its workflows load; an already running workflow may need to reload it. Re-running setup should preserve accepted choices.
+
+A missing concrete route requires a visible choice for that role, rather than upstream's automatic cross-model fallback. Required Sonnet review remains pending until the exact model is available. The build and installer do not create or overwrite this user model file.
+
+If the user needs proof against the real application and no project harness exists, offer upstream's optional verification-skill workflow once. Do not install another plugin or create a new verification regime as an automatic setup step.
