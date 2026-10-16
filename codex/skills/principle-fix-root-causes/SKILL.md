@@ -7,7 +7,7 @@ description: Apply when debugging. Trace each symptom back to the first place th
 
 ## Local harness adapter
 
-Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, or setup instructions. It also defines this port's Sonnet 5.5 reviewer. User, repository, and live tool instructions take precedence.
+Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, or setup instructions. User, repository, and live tool instructions take precedence.
 
 # Fix Root Causes
 

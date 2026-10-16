@@ -8,7 +8,7 @@ description: Apply when designing types, reviewing a function signature, or writ
 
 ## Local harness adapter
 
-Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, or setup instructions. It also defines this port's Sonnet 5.5 reviewer. User, repository, and live tool instructions take precedence.
+Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, or setup instructions. User, repository, and live tool instructions take precedence.
 
 # Type System Discipline
 

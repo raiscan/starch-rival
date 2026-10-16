@@ -71,8 +71,8 @@ class DeliveryTests(unittest.TestCase):
             "tree": git(self.source, "rev-parse", "HEAD:pstack"),
         }))
         write(baking / "release.json", '{"version": "0.1.0"}\n')
-        write(baking / "port/PORT.md", "Sonnet review.\n")
-        write(baking / "port/models.md", "claude-sonnet-5-5\n")
+        write(baking / "port/PORT.md", "Portable harness instructions.\n")
+        write(baking / "port/models.md", "interrogate reviewers: inherit-parent, auto\n")
         write(baking / "port/setup-pstack.md", "Setup fixture.\n")
         write(baking / "tests/test_smoke.py", "import unittest\nclass Smoke(unittest.TestCase):\n def test_ok(self): self.assertTrue(True)\n")
         (baking / "scripts").mkdir()

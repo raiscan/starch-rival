@@ -8,7 +8,7 @@ description: Find what a change could break somewhere else before it ships, beyo
 
 ## Local harness adapter
 
-Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, or setup instructions. It also defines this port's Sonnet 5.5 reviewer. User, repository, and live tool instructions take precedence.
+Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, or setup instructions. User, repository, and live tool instructions take precedence.
 
 # Blast radius
 

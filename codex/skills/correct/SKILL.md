@@ -8,7 +8,7 @@ description: Find the mistakes agents keep repeating in this repo and make each 
 
 ## Local harness adapter
 
-Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, or setup instructions. It also defines this port's Sonnet 5.5 reviewer. User, repository, and live tool instructions take precedence.
+Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, or setup instructions. User, repository, and live tool instructions take precedence.
 
 # Correct
 

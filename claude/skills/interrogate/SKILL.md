@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 ## Local harness adapter
 
-Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, or setup instructions. It also defines this port's Sonnet 5.5 reviewer. User, repository, and live tool instructions take precedence.
+Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, or setup instructions. User, repository, and live tool instructions take precedence.
 
 # Interrogate
 
@@ -30,11 +30,16 @@ Before spawning reviewers, state the intent in one clear paragraph from the user
 
 ## Step 3, Spawn Reviewers
 
-Read the bundled `models.md`, then overlay recognized role lines from `~/.config/pstack/models.md`. The bundled role defaults apply when the user file or role line is absent. Do not use the preserved Cursor tables or model-family fallbacks for dispatch.
+Launch all reviewers in a single message with the Task tool, one per entry on the `interrogate reviewers` line in `~/.config/pstack/models.md`, labeled Reviewer A, B, and so on to match the entry count. If the rule or that line is missing, use the table defaults.
 
-The `interrogate reviewers` line has two arms by default, the parent model and exact `claude-sonnet-5-5`. Keep the Sonnet 5.5 arm unless the user explicitly changes that requirement. A missing route leaves that review pending; do not substitute another model or call the panel complete.
+| Subagent | Default model |
+|----------|---------------|
+| Reviewer A | `claude-opus-5-5-xhigh` |
+| Reviewer B | `grok-4.7-xhigh-fast` |
 
-Use the live provider catalog and delegation route in `PORT.md`. Give every reviewer the same scoped intent, diff, surrounding contracts, rubric, and read-only constraint. Use the supported reasoning and speed controls for that provider. An independent review is separate execution, even if its model matches the parent's.
+Each reviewer gets `subagent_type: generalPurpose`, `readonly: true`, and `model` set to its configured entry, or its table default when there is no configured line. Omit `model` for an `auto` or `inherit-parent` entry, so that reviewer runs on the parent model.
+
+If the Task tool rejects a configured entry, run that reviewer on its family's table default and say so. Families go by prefix: `claude-*`, and `grok-*` with `cursor-grok-*` and `composer-*`. A refused `composer-*` entry runs on Reviewer B's default. With no family match, use Reviewer A's default. If it rejects a table default, spawn with the closest equivalent from the valid slugs in its error message (prefer the same family and reasoning tier), and open a separate PR to update the default table. Do not block the review on the slug issue. Never treat an alias entry as a rejected slug or apply either fallback to it.
 
 Read `references/reviewer-prompt.md` and fill in the same template for every reviewer with the stated intent, the diff or file contents, the rubric from `references/rubric.md`, and the code-quality lens from `references/code-quality-review.md`. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
 

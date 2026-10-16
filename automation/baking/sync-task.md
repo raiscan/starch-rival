@@ -64,7 +64,13 @@ git write-tree
 
 Validation covers the defined adaptations, provenance, native metadata, invocation rules, and full support inventory, bytes, and executable modes. `--tracked` also checks staged publication bytes and modes, so a locally valid bundle cannot silently omit an ignored supporting file. Changed references, routing, install behavior, and sync behavior receive appropriate focused checks. Candidates are never installed.
 
-Exact `claude-sonnet-5-5` independently reviews the final staged tree through the existing reviewer route described in [PORT.md](port/PORT.md). The review receives the user's intent, upstream and adapter diffs, baked changes, surrounding contracts, and completed checks. Sol evaluates the findings. One review of unchanged final work is enough; material changes require affected checks and review of the changed risk. An unavailable exact reviewer is a blocker, with no silent model substitution.
+### Independent review
+
+The following is Starch Rival repository maintenance policy, not a requirement for projects using the plugin. Exact `claude-sonnet-5-5` independently reviews the final staged tree. The review receives the user's intent, upstream and adapter diffs, baked changes, surrounding contracts, and completed checks. Sol evaluates the findings. One review of unchanged final work is enough; material changes require affected checks and review of the changed risk. An unavailable exact reviewer is a blocker, with no silent model substitution.
+
+When T3 orchestration is exposed, discover the provider instance and exact model with `orchestrator_capabilities`. Use native delegation if it supports that model, otherwise T3 `delegate_task`. Keep the returned `taskId` and follow the live tools' lifecycle instructions. Each new review round uses a new `delegate_task` call with the original brief, prior findings, responses, and unresolved objections, plus a distinct `clientRequestId` stable across retries. Do not continue reviews through a returned `childThreadId` or create ordinary top-level conversations as reviewers. Reviews are read-only tasks: no edits, commits, installation, or delivery actions.
+
+If T3 is unavailable, native Claude Code may expose the exact model through `--model claude-sonnet-5-5`. Use the available temporary-agents skill for saved identity, registry, expiry, bounded execution, and cleanup. Do not copy credentials, weaken permissions, or leave idle processes running. If neither route supports that exact model, report the review blocker.
 
 The complete object ID returned by `git write-tree` identifies the reviewed contents. Any subsequent staged change invalidates that review binding. Packaging and delivery tools enforce a matching tree; they do not attest that model review happened.
 

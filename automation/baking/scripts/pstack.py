@@ -2,7 +2,6 @@
 """Bake tracked pstack packages, install them, and prepare upstream candidates.
 
 Inputs live under automation/baking/; codex/ and claude/ are the baked packages.
-Origin: the 2026-10-15 task to port poteto's pstack with Sonnet 5.5 review.
 Sync preparation never installs a candidate or executes downloaded scripts.
 """
 
@@ -39,7 +38,7 @@ MARKETPLACES = {
 ADAPTER = (
     "\n\n## Local harness adapter\n\n"
     "Read [PORT.md](../../PORT.md) before applying Cursor-specific tool, model, "
-    "or setup instructions. It also defines this port's Sonnet 5.5 reviewer. "
+    "or setup instructions. "
     "User, repository, and live tool instructions take precedence.\n\n"
 )
 
@@ -207,15 +206,6 @@ def split_skill(text):
 def adapted_body(root, name, body):
     if name == "setup-pstack":
         return (root / BAKING / "port/setup-pstack.md").read_text()
-    if name == "interrogate" and (root / BAKING / "port/interrogate-routing.md").exists():
-        start = "## Step 3, Spawn Reviewers\n"
-        finish = "Read `references/reviewer-prompt.md`"
-        if body.count(start) != 1 or body.count(finish) != 1:
-            raise PortError("Upstream interrogate routing changed; reconcile the adapter explicitly")
-        begin, end = body.index(start), body.index(finish)
-        if end < begin:
-            raise PortError("Upstream interrogate section boundaries changed")
-        body = body[:begin] + (root / BAKING / "port/interrogate-routing.md").read_text() + "\n" + body[end:]
     return body
 
 

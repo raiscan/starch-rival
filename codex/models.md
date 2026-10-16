@@ -1,28 +1,28 @@
 # pstack model configuration
 
-These bundled defaults override model tables in the upstream Cursor text. Recognized role lines from `~/.config/pstack/models.md` override individual bundled lines. `inherit-parent` and `auto` use the parent chat model with no model override. Each comma-separated panel entry creates one arm; commas inside the role name belong to that name.
+These are the canonical pstack role defaults. The Cursor slugs below express model, effort, and speed preferences; resolve them through the live harness catalog and supported controls as described in `PORT.md`. They are not required providers or exact-version pins. Recognized role lines from `~/.config/pstack/models.md` override individual defaults. `inherit-parent` and `auto` use the parent chat model with no model override.
 
-Most roles inherit the current model. Arena and architect retain two perspectives, using the parent and Claude Opus 5.5; their concrete route must be available in the current catalog. Interrogate uses the parent and the user's pinned Claude Sonnet 5.5 reviewer. If the parent is already the other panel model, disclose the lack of model diversity and choose an available different family for the configurable arm. Keep Sonnet 5.5 in interrogate. See `PORT.md` for unavailable models and review requirements.
+Arena runners, architect runners, and interrogate reviewers create one arm per comma-separated entry, including aliases. Commas inside a role name belong to that name. The arena cross-judge pool supplies one judge, preferring another model family when possible. Preserve explicit user choices, including repeated models or aliases, and disclose limited diversity.
 
 ```text
-# budget: inherit (use supported parent/default effort)
-feature, refactoring: inherit-parent
-bug-fix: inherit-parent
-perf-issue: inherit-parent
-hillclimb: inherit-parent
-judgment and prose: inherit-parent
-hardest tasks: inherit-parent
-how explorer: inherit-parent
-how explainer: inherit-parent
-why investigators: inherit-parent
-why synthesizer: inherit-parent
-reflect tooling: inherit-parent
-reflect judgment, divergent, synthesizer: inherit-parent
-arena runners: inherit-parent, claude-opus-5-5
-arena cross-judge pool: inherit-parent, claude-opus-5-5
-swarm workers: inherit-parent
-architect runners: inherit-parent, claude-opus-5-5
-interrogate reviewers: inherit-parent, claude-sonnet-5-5
+# budget: large (xhigh)
+feature, refactoring: grok-4.7-xhigh-fast
+bug-fix: grok-4.7-xhigh-fast
+perf-issue: grok-4.7-xhigh-fast
+hillclimb: grok-4.7-xhigh-fast
+judgment and prose: claude-opus-5-5-xhigh
+hardest tasks: claude-opus-5-5-xhigh
+how explorer: grok-4.7-xhigh-fast
+how explainer: claude-opus-5-5-xhigh
+why investigators: grok-4.7-xhigh-fast
+why synthesizer: claude-opus-5-5-xhigh
+reflect tooling: grok-4.7-xhigh-fast
+reflect judgment, divergent, synthesizer: claude-opus-5-5-xhigh
+arena runners: claude-opus-5-5-xhigh, grok-4.7-xhigh-fast
+arena cross-judge pool: claude-opus-5-5-xhigh, grok-4.7-xhigh-fast
+swarm workers: grok-4.7-xhigh-fast
+architect runners: claude-opus-5-5-xhigh, grok-4.7-xhigh-fast
+interrogate reviewers: claude-opus-5-5-xhigh, grok-4.7-xhigh-fast
 ```
 
-Concrete routes are validated through the live provider catalog at setup and invocation. Effort controls are separate from model IDs unless the provider explicitly exposes a combined slug. The budget labels `unlimited`, `large`, `medium`, and `small` preserve upstream's requested effort targets of `max`, `xhigh`, `high`, and `medium` where supported. They do not change aliases or manufacture unavailable routes. Sonnet's exact version stays pinned unless the user explicitly changes it.
+The budget labels `unlimited`, `large`, `medium`, and `small` target `max`, `xhigh`, `high`, and `medium` where supported. Apply the workflow's per-task effort and speed adjustments through supported controls. Aliases retain the parent model. At setup, write only detected concrete routes or aliases; at invocation, preserve the workflow's disclosed fallback behavior for unavailable models.

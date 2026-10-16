@@ -7,7 +7,7 @@ This directory owns the canonical source pin, portability adapters, independent 
 - `upstream/` is the canonical `cursor/plugins` Git submodule; its package is `upstream/pstack/`. Keep source files verbatim. GitHub's gitlink opens the [pinned canonical repository](https://github.com/cursor/plugins/tree/f713f14203cd6420cec13cd7c55c32d598dbab68).
 - [upstream.json](upstream.json) records that commit and pstack subtree hash. `prepare-sync` advances it with the gitlink in an isolated candidate.
 - [release.json](release.json) owns the Starch Rival semantic version, initially `0.1.0`, independently of canonical pstack's version.
-- [port/](port/) contains platform, setup, and model-routing adaptations. [PORT.md](port/PORT.md) defines the exact `claude-sonnet-5-5` reviewer requirement.
+- [port/](port/) contains only consumer-facing platform, setup, and model-routing adaptations. [PORT.md](port/PORT.md) preserves canonical workflow policy; this repository's reviewer and publication requirements belong in [sync-task.md](sync-task.md#independent-review).
 - [scripts/pstack.py](scripts/pstack.py) bakes, validates, installs legacy snapshots, retires owned legacy links, and prepares source candidates. [scripts/delivery.py](scripts/delivery.py) refreshes primary `main` and publishes agent-reviewed candidates. [tests/](tests/) covers these contracts.
 
 Maintenance uses Python 3.9+, Git, and [PyYAML](requirements.txt). All command paths below are relative to the repository root:

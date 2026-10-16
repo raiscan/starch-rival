@@ -83,8 +83,8 @@ class PortTests(unittest.TestCase):
             "commit": git(self.source, "rev-parse", "HEAD"),
             "tree": git(self.source, "rev-parse", "HEAD:pstack"),
         }))
-        self.write(self.root / BAKING / "port/PORT.md", "Use the live harness and Sonnet 5.5.\n")
-        self.write(self.root / BAKING / "port/models.md", "interrogate reviewers: inherit-parent, claude-sonnet-5-5\n")
+        self.write(self.root / BAKING / "port/PORT.md", "Use the live harness.\n")
+        self.write(self.root / BAKING / "port/models.md", "interrogate reviewers: inherit-parent, auto\n")
         self.write(self.root / BAKING / "port/setup-pstack.md", "# Portable setup\n\nRead the models file.\n")
         self.write(self.root / BAKING / "release.json", json.dumps({"version": "0.1.0"}))
         self.write(self.root / ".gitignore", ".cache/\n.worktrees/\n")
@@ -143,6 +143,33 @@ class PortTests(unittest.TestCase):
         for harness in ("codex", "claude"):
             self.assertTrue((self.root / harness / "port-manifest.json").is_file())
         self.assertFalse((self.root / "dist").exists())
+
+    def test_interrogate_keeps_upstream_routing_despite_a_legacy_port_override(self):
+        body = (
+            "# Interrogate\n\n## Step 3, Spawn Reviewers\n\n"
+            "Use the configured reviewers or the upstream defaults.\n"
+            "If a model is unavailable, disclose the fallback and continue.\n\n"
+            "Read `references/reviewer-prompt.md` for the rubric.\n\n"
+            "## Step 4, Synthesize\n\nAssess findings without auto-applying them.\n"
+        )
+        self.write(self.source / "pstack/skills/interrogate/SKILL.md",
+                   "---\nname: interrogate\ndescription: Review changes.\n---\n\n" + body)
+        self.commit(self.source)
+        latest = git(self.source, "rev-parse", "HEAD")
+        git(self.module, "fetch", "origin")
+        git(self.module, "checkout", "--detach", latest)
+        manifest = json.loads((self.root / BAKING / "upstream.json").read_text())
+        manifest.update(commit=latest, tree=git(self.source, "rev-parse", "HEAD:pstack"))
+        self.write(self.root / BAKING / "upstream.json", json.dumps(manifest))
+        git(self.root, "add", str(SUBMODULE))
+        self.write(self.root / BAKING / "port/interrogate-routing.md",
+                   "## Step 3, Spawn Reviewers\n\nRequire a maintainer-only reviewer.\n")
+        self.port.bake(self.root)
+        for harness in self.port.HARNESSES:
+            skill = self.root / harness / "skills/interrogate/SKILL.md"
+            _, actual = self.port.split_skill(skill.read_text())
+            self.assertEqual(actual, self.port.ADAPTER.lstrip("\n") + body)
+        self.port.validate(self.root)
 
     def test_native_plugin_ids_versions_and_marketplaces_use_the_baked_packages(self):
         self.port.bake(self.root)
@@ -452,7 +479,7 @@ class PortTests(unittest.TestCase):
         self.write(self.root / BAKING / "port/PORT.md", "A changed adapter for review.\n")
         self.port.build(self.root)
         self.assertEqual(installed.read_bytes(), previous)
-        self.assertEqual((installed.resolve().parents[2] / "PORT.md").read_text(), "Use the live harness and Sonnet 5.5.\n")
+        self.assertEqual((installed.resolve().parents[2] / "PORT.md").read_text(), "Use the live harness.\n")
         with self.assertRaises(self.port.PortError):
             self.port.install(self.root, ["codex"], self.home)
         self.commit(self.root)
