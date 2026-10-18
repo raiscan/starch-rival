@@ -2,6 +2,10 @@
 
 Read this once when loading a pstack skill. It adapts poteto's Cursor workflows to Codex and Claude Code. Use these translations where the preserved upstream text assumes Cursor-specific tools, model slugs, or setup. User instructions, repository instructions, available tools, and host permissions take precedence over workflow defaults. Follow an already authorized delivery flow without adding generic approval ceremonies.
 
+## Canonical harness documentation
+
+The preserved upstream README and `docs/harness/claude-code.md` describe canonical pstack, not Starch Rival. Where they conflict with this adapter, use this adapter: install `starch-rival@starch-rival`, use `/starch-rival:<name>` in Claude Code, keep model overrides in `~/.config/pstack/models.md`, and discover supported models and tools rather than assuming a fixed Claude-only catalog. Native Claude registers no agents; use the persona fallback below instead of assuming `pstack:poteto-agent` or `pstack:comment-sicko` exists. Do not run canonical harness generators or write global Claude rules for this port. Preserved Cursor-only automation materials remain references, not portable services; skip unavailable integrations with a brief explanation without claiming their work ran.
+
 ## Scope and invocation
 
 The upstream skills, playbooks, references, agents, and assets remain together. Only packaging, setup, model routing, and missing Cursor integrations are adapted. Consult the bundled upstream guide for the workflows themselves. Starch Rival's project-maintenance policies do not become requirements for projects using this plugin.

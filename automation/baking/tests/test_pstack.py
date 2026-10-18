@@ -171,6 +171,36 @@ class PortTests(unittest.TestCase):
             self.assertEqual(actual, self.port.ADAPTER.lstrip("\n") + body)
         self.port.validate(self.root)
 
+    def test_new_explicit_skill_and_canonical_harness_reference_survive_baking(self):
+        name = "create-formal-verification-skill"
+        body = "# Formal verification\n\nProve one bounded property.\n"
+        reference = "# Canonical Claude adapter\n\nUse pstack:poteto-agent.\n"
+        self.write(self.source / "pstack/skills" / name / "SKILL.md",
+                   "---\nname: " + name + "\ndescription: Verify a property.\n"
+                   "disable-model-invocation: true\n---\n\n" + body)
+        self.write(self.source / "pstack/docs/harness/claude-code.md", reference)
+        self.commit(self.source)
+        latest = git(self.source, "rev-parse", "HEAD")
+        git(self.module, "fetch", "origin")
+        git(self.module, "checkout", "--detach", latest)
+        manifest = json.loads((self.root / BAKING / "upstream.json").read_text())
+        manifest.update(commit=latest, tree=git(self.source, "rev-parse", "HEAD:pstack"))
+        self.write(self.root / BAKING / "upstream.json", json.dumps(manifest))
+        git(self.root, "add", str(SUBMODULE))
+        self.assertEqual(self.port.bake(self.root)["skills"], 3)
+        for harness in self.port.HARNESSES:
+            output = self.root / harness
+            self.assertEqual((output / "docs/harness/claude-code.md").read_text(), reference)
+            front, actual = self.port.split_skill((output / "skills" / name / "SKILL.md").read_text())
+            self.assertEqual(actual, self.port.ADAPTER.lstrip("\n") + body)
+            self.assertEqual(front["name"], name)
+            if harness == "claude":
+                self.assertTrue(front["disable-model-invocation"])
+            else:
+                policy = yaml.safe_load((output / "skills" / name / "agents/openai.yaml").read_text())
+                self.assertFalse(policy["policy"]["allow_implicit_invocation"])
+        self.port.validate(self.root)
+
     def test_native_plugin_ids_versions_and_marketplaces_use_the_baked_packages(self):
         self.port.bake(self.root)
         for harness in ("codex", "claude"):
