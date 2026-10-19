@@ -171,8 +171,16 @@ class PortTests(unittest.TestCase):
             self.assertEqual(actual, self.port.ADAPTER.lstrip("\n") + body)
         self.port.validate(self.root)
 
+    def test_port_setup_preserves_optional_formal_verification_offer(self):
+        setup = (Path(__file__).resolve().parents[1] / "port/setup-pstack.md").read_text()
+        self.assertIn("/create-formal-verification-skill", setup)
+        self.assertIn("project has no formal verification skill", setup)
+        self.assertIn("only on acceptance", setup)
+        self.assertIn("on refusal, move on without pushing", setup)
+        self.assertIn("~/.config/pstack/models.md", setup)
+
     def test_new_explicit_skill_and_canonical_harness_reference_survive_baking(self):
-        name = "create-formal-verification-skill"
+        name = "maintain-formal-verification-skill"
         body = "# Formal verification\n\nProve one bounded property.\n"
         reference = "# Canonical Claude adapter\n\nUse pstack:poteto-agent.\n"
         self.write(self.source / "pstack/skills" / name / "SKILL.md",

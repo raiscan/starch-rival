@@ -11,4 +11,4 @@ Configure pstack's role choices in `~/.config/pstack/models.md`. Read the bundle
 
 As in upstream setup, an unavailable concrete choice must be resolved before writing it. This does not disable the workflows' invocation-time model fallbacks. The build and installer do not create or overwrite this user model file.
 
-If the user needs proof against the real application and no project harness exists, offer upstream's optional verification-skill workflow once. Do not install another plugin or create a new verification regime as an automatic setup step.
+If the user needs proof against the real application and no project harness exists, offer upstream's optional verification-skill workflow once. Then, if the project has no formal verification skill (a project skill that runs a model checker, a proof, or another verifier against the code), offer `/create-formal-verification-skill` once. Invoke either generator only on acceptance; on refusal, move on without pushing. Do not install another plugin or create a new verification regime as an automatic setup step.

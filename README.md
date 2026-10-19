@@ -2,7 +2,7 @@
 
 Ready-to-use Codex and Claude Code translations of [pstack](https://github.com/cursor/plugins/tree/main/pstack), created by **Lauren Tan ([poteto](https://github.com/poteto))**.
 
-The complete translated packages are tracked here: [Codex](codex/) and [Claude Code](claude/), each with 55 skills and the upstream supporting materials. Starch Rival preserves the workflows with a small adapter for platform metadata, model routing, setup, and Cursor integrations. It is independently maintained and is not an official pstack distribution.
+The complete translated packages are tracked here: [Codex](codex/) and [Claude Code](claude/), each with 56 skills and the upstream supporting materials. Starch Rival preserves the workflows with a small adapter for platform metadata, model routing, setup, and Cursor integrations. It is independently maintained and is not an official pstack distribution.
 
 ## Install and use
 
@@ -42,10 +42,10 @@ It validates and copies the tracked packages into immutable `.cache/installed/` 
 
 The source, adapters, baking tools, tests, and Hermes lifecycle live in [automation/baking/](automation/baking/README.md). `release.json` owns the port's independent version, initially `0.1.0`; the canonical package has its own version. `bump-version` advances the port before `bake` refreshes both tracked packages and native marketplace metadata. Validation checks the complete packages and their staged publication contents. Edit adapters and tooling, then rebake rather than hand-editing the packages.
 
-The canonical source is the Git submodule at `automation/baking/upstream/`, with the package at `automation/baking/upstream/pstack/`. Its [manifest](automation/baking/upstream.json) records commit [`0b8e952`](https://github.com/cursor/plugins/tree/0b8e952052d482ee6de06deebf14d590d77b1b34) and the matching pstack subtree hash. The source stays verbatim. The [pinned upstream guide](https://github.com/cursor/plugins/blob/0b8e952052d482ee6de06deebf14d590d77b1b34/pstack/docs/guide/README.md) explains the workflows, and [AGENTS.md](AGENTS.md) defines repository delivery boundaries.
+The canonical source is the Git submodule at `automation/baking/upstream/`, with the package at `automation/baking/upstream/pstack/`. Its [manifest](automation/baking/upstream.json) records commit [`d457567`](https://github.com/cursor/plugins/tree/d457567332aa6989e753ea289f30ea2bfbc80bc0) and the matching pstack subtree hash. The source stays verbatim. The [pinned upstream guide](https://github.com/cursor/plugins/blob/d457567332aa6989e753ea289f30ea2bfbc80bc0/pstack/docs/guide/README.md) explains the workflows, and [AGENTS.md](AGENTS.md) defines repository delivery boundaries.
 
 An existing Hermes cron uses Sol to assess canonical changes, reconcile adaptations, bake and test a version, and obtain exact Sonnet 5.5 review. The owner has authorized that job to commit the reviewed candidate, fast-forward primary `main`, verify the integrated result, and push only `main`. The [maintenance lifecycle](automation/baking/sync-task.md) explains its checks and failure handling. Hermes runs on a separate host; its saved working directory, model, reviewer route, schedule, and run history remain authoritative. Repository changes take effect there after its next successful refresh; they do not rewrite the live job.
 
 ## License and attribution
 
-[MIT](LICENSE). The pstack workflows, playbooks, agent prompts, and supporting materials are Lauren Tan's work; their [original license](https://github.com/cursor/plugins/blob/0b8e952052d482ee6de06deebf14d590d77b1b34/pstack/LICENSE) is preserved in the pinned submodule and baked packages. Starch Rival adds the portability adapter, packaging, installation, and sync tooling. This port is published at [raiscan/starch-rival](https://github.com/raiscan/starch-rival).
+[MIT](LICENSE). The pstack workflows, playbooks, agent prompts, and supporting materials are Lauren Tan's work; their [original license](https://github.com/cursor/plugins/blob/d457567332aa6989e753ea289f30ea2bfbc80bc0/pstack/LICENSE) is preserved in the pinned submodule and baked packages. Starch Rival adds the portability adapter, packaging, installation, and sync tooling. This port is published at [raiscan/starch-rival](https://github.com/raiscan/starch-rival).
