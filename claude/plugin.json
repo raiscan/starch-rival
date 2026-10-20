@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "starch-rival",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Starch Rival: an unofficial port of Lauren Tan (poteto)'s pstack workflows.",
   "author": {
     "name": "raiscan",
@@ -26,10 +26,10 @@
         "repository": "https://github.com/cursor/plugins.git",
         "ref": "main",
         "path": "pstack",
-        "commit": "d457567332aa6989e753ea289f30ea2bfbc80bc0",
-        "tree": "06803099e18ed488c8c2a2fda118ce772b4e2a77",
+        "commit": "88d47514b82e7c44f00f2b2a72ff6dd12158038c",
+        "tree": "34a0b817e5ea92375bb10f20b15cf750d4e8095a",
         "name": "pstack",
-        "version": "0.15.28",
+        "version": "0.15.29",
         "author": {
           "name": "Lauren Tan"
         },
