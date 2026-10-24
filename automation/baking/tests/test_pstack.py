@@ -171,6 +171,21 @@ class PortTests(unittest.TestCase):
             self.assertEqual(actual, self.port.ADAPTER.lstrip("\n") + body)
         self.port.validate(self.root)
 
+    def test_reflection_copy_policy_is_bundled_for_both_native_harnesses(self):
+        adapter = (SCRIPT.parents[1] / "port/PORT.md").read_text()
+        self.assertIn("## Reflection copies", adapter)
+        for rule in ("active harness's supported project or user skill directory",
+                     "show the exact destination before approval",
+                     "Never edit plugin caches",
+                     "resolve `../../PORT.md` and other bundled references",
+                     "stop and explain the limitation"):
+            self.assertIn(rule, adapter)
+        self.write(self.root / BAKING / "port/PORT.md", adapter)
+        self.port.bake(self.root)
+        for harness in self.port.HARNESSES:
+            self.assertEqual((self.root / harness / "PORT.md").read_text(), adapter)
+        self.port.validate(self.root)
+
     def test_port_setup_preserves_optional_formal_verification_offer(self):
         setup = (Path(__file__).resolve().parents[1] / "port/setup-pstack.md").read_text()
         self.assertIn("/create-formal-verification-skill", setup)
