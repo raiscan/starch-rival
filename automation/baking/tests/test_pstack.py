@@ -186,6 +186,36 @@ class PortTests(unittest.TestCase):
             self.assertEqual((self.root / harness / "PORT.md").read_text(), adapter)
         self.port.validate(self.root)
 
+    def test_interrogate_repros_do_not_relax_read_only_reviewer_constraints(self):
+        adapter = (SCRIPT.parents[1] / "port/PORT.md").read_text()
+        for rule in ("delegates assigned read-only work must not edit files",
+                     "Interrogate adversaries may create bounded repro/test/prototype artifacts",
+                     "only in their own isolated worktrees",
+                     "they must not fix the reviewed change",
+                     "Neither read-only reviewers nor Interrogate adversaries may commit, install, or invoke delivery actions",
+                     "Interrogate delegates runner selection to Arena Phase A"):
+            self.assertIn(rule, adapter)
+        self.assertNotIn("reviewers must not edit files", adapter)
+        self.write(self.root / BAKING / "port/PORT.md", adapter)
+        self.port.bake(self.root)
+        for harness in self.port.HARNESSES:
+            self.assertEqual((self.root / harness / "PORT.md").read_text(), adapter)
+        self.port.validate(self.root)
+
+    def test_arena_judge_contract_is_consistent_across_port_defaults(self):
+        for name in ("PORT.md", "models.md", "setup-pstack.md"):
+            text = (SCRIPT.parents[1] / "port" / name).read_text()
+            self.assertIn("at most one judge", text)
+            self.assertIn("`inherit-parent` and `auto` never judge", text)
+            self.assertNotIn("preferring another model family when possible", text)
+            self.assertNotIn("preferring a different model family", text)
+        adapter = (SCRIPT.parents[1] / "port/PORT.md").read_text()
+        self.write(self.root / BAKING / "port/PORT.md", adapter)
+        self.port.bake(self.root)
+        for harness in self.port.HARNESSES:
+            self.assertEqual((self.root / harness / "PORT.md").read_text(), adapter)
+        self.port.validate(self.root)
+
     def test_port_setup_preserves_optional_formal_verification_offer(self):
         setup = (Path(__file__).resolve().parents[1] / "port/setup-pstack.md").read_text()
         self.assertIn("/create-formal-verification-skill", setup)
