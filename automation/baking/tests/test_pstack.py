@@ -216,6 +216,37 @@ class PortTests(unittest.TestCase):
             self.assertEqual((self.root / harness / "PORT.md").read_text(), adapter)
         self.port.validate(self.root)
 
+    def test_current_model_policy_reaches_both_native_harnesses(self):
+        baking = SCRIPT.parents[1]
+        models = (baking / "port/models.md").read_text()
+        canonical = (baking / "upstream/pstack/skills/setup-pstack/SKILL.md").read_text()
+        def roles(text):
+            return dict(line.split(": ", 1) for line in text.splitlines()
+                        if ": " in line and not line.startswith("#")
+                        and line.split(": ", 1)[0] in {
+                            "feature, refactoring", "bug-fix", "perf-issue", "hillclimb",
+                            "judgment and prose", "arena runners", "arena cross-judge pool",
+                            "swarm workers", "interrogate reviewers"})
+        self.assertEqual(roles(models), roles(canonical))
+        for retired in ("how explorer:", "architect runners:", "hardest tasks:"):
+            self.assertNotIn(retired, models)
+        for name in ("PORT.md", "models.md", "setup-pstack.md"):
+            text = (baking / "port" / name).read_text()
+            self.assertIn("vendor", text)
+            self.assertIn("Fable", text)
+            self.assertNotIn("default-pool fallback", text)
+            self.write(self.root / BAKING / "port" / name, text)
+        setup = (baking / "port/setup-pstack.md").read_text()
+        self.assertIn("# defaults: 3", setup)
+        self.assertIn("only during user-authorized setup", setup)
+        self.assertIn("lowers it one step", setup)
+        self.assertNotIn("Offer the upstream budget choices `unlimited`", setup)
+        self.port.bake(self.root)
+        for harness in self.port.HARNESSES:
+            self.assertEqual((self.root / harness / "models.md").read_text(), models)
+            self.assertIn("# defaults: 3", (self.root / harness / "skills/setup-pstack/SKILL.md").read_text())
+        self.port.validate(self.root)
+
     def test_port_setup_preserves_optional_formal_verification_offer(self):
         setup = (Path(__file__).resolve().parents[1] / "port/setup-pstack.md").read_text()
         self.assertIn("/create-formal-verification-skill", setup)
