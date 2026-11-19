@@ -12,10 +12,10 @@ bug-fix: claude-opus-5-5-xhigh-fast
 perf-issue: claude-opus-5-5-xhigh-fast
 hillclimb: claude-opus-5-5-xhigh-fast
 judgment and prose: claude-opus-5-5-xhigh-fast
-arena runners: claude-fable-5-2-high, claude-opus-5-5-high-fast, gemini-4-carbon-high
-arena cross-judge pool: claude-opus-5-5-high-fast, gemini-4-carbon-high
+arena runners: claude-fable-5-2-high, claude-opus-5-5-high-fast, gemini-4-neon-high
+arena cross-judge pool: claude-opus-5-5-high-fast, gemini-4-neon-high
 swarm workers: claude-opus-5-5-high-fast
-interrogate reviewers: claude-fable-5-2-high, claude-opus-5-5-high-fast, gemini-4-carbon-high
+interrogate reviewers: claude-fable-5-2-high, claude-opus-5-5-high-fast, gemini-4-neon-high
 ```
 
 `large` keeps each role's default effort, `medium` lowers it one step, and `small` lowers it two on `xhigh` > `high` > `medium` > `low`, clamped at `low`. No role runs above `xhigh`; panel seats keep their listed level at invocation. Resolve Opus 5.5's fast preference and Gemini's `high` ceiling through supported controls, not invented IDs. Verification uses `swarm workers`. Outside a panel, Fable 5.2 runs only when the user names it for the task or after two Opus 5.5 xhigh runs of the same brief fail their check; disclose which condition applies. Aliases retain the parent model. At setup, write only detected routes or aliases; at invocation, preserve the workflow's disclosed fallbacks.

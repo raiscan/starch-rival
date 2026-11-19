@@ -239,6 +239,13 @@ class PortTests(unittest.TestCase):
         setup = (baking / "port/setup-pstack.md").read_text()
         self.assertIn("# defaults: 3", setup)
         self.assertIn("only during user-authorized setup", setup)
+        self.assertIn("`gemini-4-*` entry other than `gemini-4-neon-*`", setup)
+        self.assertIn("applies even with `# defaults: 3`", setup)
+        self.assertIn("Do not apply this migration at invocation", setup)
+        self.assertIn("preserve other scalar roles, aliases, list order, and panel counts", setup)
+        self.assertIn("keep Gemini entries at or below `high`", setup)
+        for role in ("arena runners", "arena cross-judge pool", "interrogate reviewers"):
+            self.assertIn("gemini-4-neon-high", roles(models)[role])
         self.assertIn("lowers it one step", setup)
         self.assertNotIn("Offer the upstream budget choices `unlimited`", setup)
         self.port.bake(self.root)

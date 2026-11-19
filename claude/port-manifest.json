@@ -3,11 +3,11 @@
     "repository": "https://github.com/cursor/plugins.git",
     "ref": "main",
     "path": "pstack",
-    "commit": "e1cc03121a0e71129a4fb730d7c5528a0a3e43c8",
-    "tree": "71d8e1d1d718e2149dc43b2535618064f29cba6b"
+    "commit": "e58dd043600587dbaf58ba315e7f2b38373eeb43",
+    "tree": "1186430edb1d16e41d644aaf155a92a09efe06ff"
   },
-  "input_sha256": "f06c642a4513bac8b88fbba6f1adf5ae92b58577e77a77ee5ff6fed3557597dd",
+  "input_sha256": "7718f3b05dc81f40fc1b1881f3437dbd311221e2474f049a5c46b16b5d606a70",
   "harness": "claude",
   "skills": 58,
-  "version": "0.1.10"
+  "version": "0.1.11"
 }
